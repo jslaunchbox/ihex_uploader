@@ -121,6 +121,7 @@ static volatile bool data_arrived;
 static char data_buf[RING_BUFFER_LENGTH];
 uint32_t head = 0;   // buffer process head, position where i am reading
 uint32_t tail = 0;   // buffer process tail, where i am writing.
+uint32_t lstart = 0; // line start
 
 uint8_t uart_state = 0;
 enum {
@@ -179,7 +180,11 @@ void print_acm(const char *buf)
 void nprint(const char *buf, unsigned int size)
 {
 	for (int t = 0; t < size; t++) {
-		printf("%c", buf[t]);
+		if ((buf[t] == '\r' && buf[t + 1] != '\n') || (buf[t] == '\n' && buf[t - 1] != '\r')) {
+			printf("*\r\n");
+		} else {
+			printf("%c",buf[t]);
+		}
 	}
 }
 
@@ -194,6 +199,10 @@ void uart_handle_upload_error() {
 
 uint8_t uart_get_last_state() {
 	return uart_state;
+}
+
+void uart_clear() {
+	lstart = head = tail = 0;
 }
 
 void uart_print_buffer_line(const char *data_buf, uint32_t lstart, uint32_t head) {
@@ -219,7 +228,7 @@ void uart_printbuffer() {
 void uart_uploader_runner(int arg1, int arg2)
 {
 	uint32_t bytes_read = 0;
-	uint32_t lstart = 0; // line start
+	uint8_t  prev = 0;
 	uint32_t len = 0;    // buffer available
 	bool marker = false;
 
@@ -239,7 +248,7 @@ void uart_uploader_runner(int arg1, int arg2)
 				fiber_sleep(MSEC(60000));
 				if (data_arrived == false) {
 					printf("[Timeout]\n");
-					lstart = head = tail = 0;
+					uart_clear();
 				}
 			};
 			data_arrived = false;
@@ -249,8 +258,8 @@ void uart_uploader_runner(int arg1, int arg2)
 				uart_state = UART_RESET_TAIL;
 				tail = 0;
 			}
-			len = sizeof(data_buf) - tail;
 
+			len = sizeof(data_buf) - tail;
 			bytes_read = uart_fifo_read(dev_upload, &data_buf[tail], len);
 			tail += bytes_read;
 			uart_state = UART_FIFO_READ;
@@ -258,7 +267,7 @@ void uart_uploader_runner(int arg1, int arg2)
 			for (int t = 0; t < bytes_read; t++) {
 				uart_state = UART_FIFO_DATA_PROCESS;
 				uint8_t byte = data_buf[head];
-				//write_data(&byte, 1);
+				write_data(&byte, 1);
 				switch (byte) {
 				case ':':
 					lstart = head;
@@ -266,13 +275,16 @@ void uart_uploader_runner(int arg1, int arg2)
 					break;
 				case '\r':
 					printf("[IF]");
-					uart_print_buffer_line(data_buf, lstart, head);
-					printf("\n");
+					//uart_print_buffer_line(data_buf, lstart, head);
+					//printf("\n");
 					lstart = head + 1;
 					break;
 				case '\n':
+					if (prev!='\r')
+						write_data('\r', 1);
+
 					if (marker) {
-						printf("[EOM] %d - %d - %d \n", (int) lstart, (int) head, (int)tail);
+						//printf("[EOM] %d - %d - %d \n", (int) lstart, (int) head, (int)tail);
 						uart_print_buffer_line(data_buf, lstart, head);
 						if (lstart > head) {
 							ihex_read_bytes(&ihex, data_buf + lstart, RING_BUFFER_LENGTH - lstart);
@@ -282,19 +294,20 @@ void uart_uploader_runner(int arg1, int arg2)
 							ihex_read_bytes(&ihex, data_buf + lstart, head - lstart);
 						}
 
-						printf("[B]");
-						uart_print_buffer_line(data_buf, lstart, head);
-						printf("[E]");
+						//printf("[B]");
+						//uart_print_buffer_line(data_buf, lstart, head);
+						//printf("[E]");
 						marker = false;
 					} else {
 						printf("[CR]");
-						uart_print_buffer_line(data_buf, lstart, head);
+						//uart_print_buffer_line(data_buf, lstart, head);
 					}
 
 					lstart = head + 1;
 					break;
 				}
 
+				prev = byte;
 				head++;
 				if (head == RING_BUFFER_LENGTH) {
 					uart_state = UART_RESET_HEAD;

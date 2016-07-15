@@ -113,6 +113,11 @@ static int shell_acm_command(int argc, char *argv[])
 		return 0;
 	}
 
+	if (!strcmp(cmd, "clear")) {
+		uart_clear();
+		return 0;
+	}
+
 	if (!strcmp(cmd, "print")) {
 		for (int t = 2; t < argc; t++) {
 			if (t>2) print_acm(" ");
