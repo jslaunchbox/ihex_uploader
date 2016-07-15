@@ -235,6 +235,18 @@ void uart_rx_renable(void) {
 	uart_irq_rx_enable(dev_upload);
 }
 
+uint32_t uart_get_baudrate(void) {
+	uint32_t baudrate;
+
+	int ret = uart_line_ctrl_get(dev_upload, LINE_CTRL_BAUD_RATE, &baudrate);
+	if (ret)
+		printf("Failed to get baudrate, ret code %d\n", ret);
+	else
+		printf("Baudrate detected: %d\n", (int)baudrate);
+
+	return baudrate;
+}
+
 void uart_uploader_init(void) {
 	uint32_t baudrate, dtr = 0;
 	int ret;
@@ -265,11 +277,7 @@ void uart_uploader_init(void) {
 	/* Wait 1 sec for the host to do all settings */
 	sys_thread_busy_wait(1000000);
 
-	ret = uart_line_ctrl_get(dev_upload, LINE_CTRL_BAUD_RATE, &baudrate);
-	if (ret)
-		printf("Failed to get baudrate, ret code %d\n", ret);
-	else
-		printf("Baudrate detected: %d\n", (int)baudrate);
+	uart_get_baudrate();
 
 	uart_irq_rx_disable(dev_upload);
 	uart_irq_tx_disable(dev_upload);

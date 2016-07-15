@@ -89,31 +89,45 @@ static int shell_cmd_version(int argc, char *argv[])
 	return 0;
 } /* shell_cmd_version */
 
-static int shell_renable_acm(int argc, char *argv[])
+static int shell_acm_command(int argc, char *argv[])
 {
-	uart_rx_renable();
-	return 0;
-} /* shell_enable_acm */
-
-static int shell_reinit_acm(int argc, char *argv[])
-{
-	uart_uploader_init();
-	return 0;
-} /* shell_enable_acm */
-
-static int shell_acm_print(int argc, char *argv[])
-{
-	if (argc <= 1) {
+	if (argc <= 1)
 		return -1;
+
+	char *cmd = argv[1];
+
+	printf("[ACM] %s\n",cmd);
+
+	if (!strcmp(cmd, "renable")) {
+		uart_rx_renable();
+		return 0;
 	}
 
-	for (int t = 1; t < argc; t++) {
-		if (t>1) print_acm(" ");
-		print_acm(argv[t]);
+	if (!strcmp(cmd, "init")) {
+		uart_uploader_init();
+		return 0;
 	}
-	print_acm("\r\n");
+
+	if (!strcmp(cmd, "get_baudrate")) {
+		uart_get_baudrate();
+		return 0;
+	}
+
+	if (!strcmp(cmd, "print")) {
+		for (int t = 2; t < argc; t++) {
+			if (t>2) print_acm(" ");
+			print_acm(argv[t]);
+		}
+		print_acm("\r\n");
+		return 0;
+	}
+
+	if (!strcmp(cmd, "status")) {
+		return 0;
+	}
+	printf("Command unknown\n");
 	return 0;
-} /* shell_acm_print */
+} /* shell_acm_command */
 
 static int shell_cmd_test(int argc, char *argv[])
 {
@@ -179,10 +193,9 @@ const struct shell_cmd commands[] =
   SHELL_COMMAND("syntax", shell_cmd_syntax_help),
   SHELL_COMMAND("version", shell_cmd_version),
   SHELL_COMMAND("test", shell_cmd_test),
-  SHELL_COMMAND("print", shell_acm_print),
-  SHELL_COMMAND("acm_renable", shell_renable_acm),
-  SHELL_COMMAND("acm_reinit", shell_reinit_acm),
+  SHELL_COMMAND("acm", shell_acm_command),
   SHELL_COMMAND("verbose", shell_cmd_verbose),
+
   SHELL_COMMAND(NULL, NULL)
 };
 #endif

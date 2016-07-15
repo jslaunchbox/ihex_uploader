@@ -19,5 +19,6 @@
 void uart_uploader_init(void);
 void print_acm(const char *buf);
 void uart_rx_renable();
+uint32_t uart_get_baudrate(void);
 
 #endif
