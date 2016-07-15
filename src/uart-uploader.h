@@ -16,10 +16,8 @@
 #ifndef __UART_UPLOADER_H__
 #define __UART_UPLOADER_H__
 
-// TODO @sergioamr Move this definition to the configuration
-#define CONFIG_UART_UPLOAD_HANDLER_STACKSIZE 1024
-
-void code_runner(int arg1, int arg2);
 void uart_uploader_init(void);
+void print_acm(const char *buf);
+void uart_rx_renable();
 
 #endif

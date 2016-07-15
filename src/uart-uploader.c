@@ -47,13 +47,14 @@
 #include "code-memory.h"
 #include "jerry-code.h"
 
+#include "uart-uploader.h"
 #include "ihex/kk_ihex_read.h"
 
 #define CONFIG_UART_UPLOAD_HANDLER_STACKSIZE 2000
 
 #define STACKSIZE CONFIG_UART_UPLOAD_HANDLER_STACKSIZE
 
-static char __stack fiberStack[STACKSIZE];
+const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\n";
 
 //#define DEBUG_UART
 
@@ -63,211 +64,21 @@ static char __stack fiberStack[STACKSIZE];
  */
 static CODE *code_memory = NULL;
 
-/**************************** UART CAPTURE **********************************/
-
-static struct ihex_state ihex;
-
-static struct nano_fifo avail_queue;
-static struct nano_fifo lines_queue;
-
-static struct device *uart_uploader_dev;
+/********************** DATA PROCESS ****************************************/
 
 /* Control characters for testing and debugging */
 #define ESC                0x1b
 #define DEL                0x7f
 
-#define MAX_LINE_LEN 128
-struct uart_uploader_input {
-	int _unused;
-	char line[MAX_LINE_LEN];
-};
+/****************************** IHEX ****************************************/
 
-#define MAX_LINES_QUEUED 8
-static struct uart_uploader_input buf[MAX_LINES_QUEUED];
+static struct ihex_state ihex;
 
-#if defined(CONFIG_PRINTK) || defined(CONFIG_STDOUT_CONSOLE)
-
-void uart_clear(void) {
-	int i;
-	for (i = 0; i < MAX_LINES_QUEUED; i++) {
-		nano_fifo_put(&avail_queue, &buf[i]);
-	}
-}
-
-/**
-* Outputs both line feed and carriage return in the case of a '\n'.
-* @param c Character to output
-* @return The character passed as input.
-*/
-
-static int uploader_out(int c)
-{
-	uart_poll_out(uart_uploader_dev, (unsigned char)c);
-	if ('\n' == c) {
-		uart_poll_out(uart_uploader_dev, (unsigned char)'\r');
-	}
-	return c;
-}
-
-#endif
-
-extern void __stdout_hook_install(int(*hook)(int));
-
-static int read_uart(struct device *uart, uint8_t *buf, unsigned int size)
-{
-	int rx;
-	rx = uart_fifo_read(uart, buf, size);
-	if (rx < 0) {
-		/* Overrun issue. Stop the UART */
-		uart_irq_rx_disable(uart);
-		return -EIO;
-	}
-	return rx;
-}
-
-static uint8_t cur;
-
-void uart_uploader_isr(struct device *unused)
-{
-	ARG_UNUSED(unused);
-
-	while (uart_irq_update(uart_uploader_dev) &&
-		uart_irq_is_pending(uart_uploader_dev)) {
-		static struct uart_uploader_input *cmd = NULL;
-		uint8_t byte;
-		int rx;
-
-		if (!uart_irq_rx_ready(uart_uploader_dev)) {
-			continue;
-		}
-
-		/* Character(s) have been received */
-
-		rx = read_uart(uart_uploader_dev, &byte, 1);
-		if (rx < 0) {
-			return;
-		}
-
-		if (uart_irq_input_hook(uart_uploader_dev, byte) != 0) {
-			/*
-			* The input hook indicates that no further processing
-			* should be done by this handler.
-			*/
-			return;
-		}
-
-		if (!cmd) {
-			cmd = nano_isr_fifo_get(&avail_queue, TICKS_NONE);
-			if (!cmd) {
-				//uart_poll_out(uart_uploader_dev, 'c');
-				return;
-			}
-		}
-
-		/* Handle special control characters */
-		if (!isprint(byte)) {
-			switch (byte) {
-			case DEL:
-				cmd->line[cur] = '\0';
-				printf("[%s]%d\n", cmd->line, cur);
-				break;
-			case ESC:
-				// Clear
-				printf("[CLR]\n");
-				uart_clear();
-				break;
-			case '\r':
-				cur = 0;
-				printf("[ACK]\n");
-				break;
-			case '\n':
-				cmd->line[cur] = '\0';
-				nano_isr_fifo_put(&lines_queue, cmd);
-				cur = 0;
-				cmd = NULL;
-				break;
-			default:
-				break;
-			}
-
-			continue;
-		}
-
-		/* Flush the data into the buffer if end of line or each 32 bytes */
-		cmd->line[cur++] = byte;
-
-		if (cur >= MAX_LINE_LEN) {
-			cmd->line[cur] = '\0';
-			nano_isr_fifo_put(&lines_queue, cmd);
-			cur = 0;
-			cmd = NULL;
-		}
-	}
-}
-
-void uploader_input_init(void) {
-	uint8_t c;
-
-	uart_irq_rx_disable(uart_uploader_dev);
-	uart_irq_tx_disable(uart_uploader_dev);
-
-	uart_irq_callback_set(uart_uploader_dev, uart_uploader_isr);
-
-	/* Drain the fifo */
-	while (uart_irq_rx_ready(uart_uploader_dev)) {
-		uart_fifo_read(uart_uploader_dev, &c, 1);
-	}
-	uart_irq_rx_enable(uart_uploader_dev);
-}
-
-int8_t upload_state = 0;
+static int8_t upload_state = 0;
 #define UPLOAD_START       0
 #define UPLOAD_IN_PROGRESS 1
 #define UPLOAD_FINISHED    2
 #define UPLOAD_ERROR       -1
-
-/*
- * Negotiate a re-upload
- */
-void uart_handle_upload_error() {
-	printf("[Download Error]\n");
-}
-
-void uart_uploader_runner(int arg1, int arg2)
-{
-	const char *code_name = "test.js";
-
-	struct uart_uploader_input *cmd;
-	while (1) {
-		upload_state = UPLOAD_START;
-		printf("[Waiting for data]\n");
-		ihex_begin_read(&ihex);
-		code_memory = csopen(code_name, "w+");
-
-		while (upload_state != UPLOAD_FINISHED) {
-			cmd = nano_fiber_fifo_get(&lines_queue, TICKS_UNLIMITED);
-
-#ifdef DEBUG_UART
-			printf("[Read][%s]\n", cmd->line);
-#endif
-			ihex_read_bytes(&ihex, cmd->line, strlen(cmd->line));
-
-			if (upload_state == UPLOAD_ERROR) {
-				uart_handle_upload_error();
-				break;
-			}
-
-			nano_fiber_fifo_put(&avail_queue, cmd);
-		}
-
-		if (upload_state == UPLOAD_FINISHED) {
-			csclose(code_memory);
-			ihex_end_read(&ihex);
-			javascript_run_code(code_name);
-		}
-
-	}
-}
 
 /* Data received from the buffer */
 ihex_bool_t ihex_data_read(struct ihex_state *ihex,
@@ -281,7 +92,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 
 	if (type == IHEX_DATA_RECORD) {
 		upload_state = UPLOAD_IN_PROGRESS;
-		unsigned long address = (unsigned long) IHEX_LINEAR_ADDRESS(ihex);
+		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
 		ihex->data[ihex->length] = 0;
 #ifdef DEBUG_UART
 		printf("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
@@ -290,43 +101,185 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		cswrite(ihex->data, ihex->length, 1, code_memory);
 	}
 	else if (type == IHEX_END_OF_FILE_RECORD) {
-		printf("[EOF]\n");
+		print_acm("[EOF]\n");
 		upload_state = UPLOAD_FINISHED;
 	}
 	return true;
 }
 
-/* Setup code uploader */
-void uart_uploader_init(void) {
+/**************************** UART CAPTURE **********************************/
 
-	nano_fifo_init(&lines_queue);
-	nano_fifo_init(&avail_queue);
-	uart_clear();
+static struct device *dev_upload;
 
-	task_fiber_start(fiberStack, STACKSIZE, uart_uploader_runner, 0, 0, 7, 0);
+static volatile bool data_transmitted;
+static volatile bool data_arrived;
+static char data_buf[128];
 
-	/* Register uart handler */
-	uploader_input_init();
-
-} /* uart_uploader_init */
-
-/**
-*
-* @brief Initialize one UART as the uploader/debug port
-*
-* @return 0 if successful, otherwise failed.
-*/
-static int uart_serial_uploader_init(struct device *arg)
+static void interrupt_handler(struct device *dev)
 {
-	ARG_UNUSED(arg);
-	uart_uploader_dev = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
+	uart_irq_update(dev);
 
-	/* Install printk / stdout hook for UART uploader output */
-	__stdout_hook_install(uploader_out);
-	return 0;
+	if (uart_irq_tx_ready(dev)) {
+		data_transmitted = true;
+	}
+
+	if (uart_irq_rx_ready(dev)) {
+		data_arrived = true;
+	}
 }
 
-/* UART uploader initializes after the UART device itself */
-SYS_INIT(uart_serial_uploader_init,
-	SECONDARY,
-	CONFIG_UART_CONSOLE_INIT_PRIORITY);
+static void write_data(struct device *dev, const char *buf, int len)
+{
+	uart_irq_tx_enable(dev);
+
+	data_transmitted = false;
+	uart_fifo_fill(dev, buf, len);
+	while (data_transmitted == false);
+
+	uart_irq_tx_disable(dev);
+}
+
+void print_acm(const char *buf)
+{
+	write_data(dev_upload, buf, strlen(buf));
+}
+
+/*
+static void read_and_echo_data(struct device *dev, int *bytes_read)
+{
+	while (data_arrived == false)
+		;
+
+	data_arrived = false;
+
+	while ((*bytes_read = uart_fifo_read(dev,
+		data_buf, sizeof(data_buf)))) {
+		write_data(dev, data_buf, *bytes_read);
+	}
+}
+*/
+
+/**************************** DEVICE **********************************/
+/*
+* Negotiate a re-upload
+*/
+
+void uart_handle_upload_error() {
+	printf("[Download Error]\n");
+}
+
+void uart_uploader_runner()
+{
+	uint32_t bytes_read = 0;
+	uint32_t pos = 0;
+	bool begin_marker = false;
+	const char *code_name = "test.js";
+
+	while (1) {
+		upload_state = UPLOAD_START;
+		print_acm("[Waiting for data]\n");
+
+		ihex_begin_read(&ihex);
+		code_memory = csopen(code_name, "w+");
+
+		while (upload_state != UPLOAD_FINISHED) {
+			while (data_arrived == false);
+			data_arrived = false;
+
+			/* Read all data and echo it back */
+			bytes_read = uart_fifo_read(dev_upload, &data_buf[pos], sizeof(data_buf) - pos);
+			//write_data(dev_upload, &data_buf[pos], bytes_read);
+
+			for (int t = 0; t < bytes_read; t++) {
+				uint8_t byte = data_buf[pos++];
+				write_data(dev_upload, &byte, 1);
+				switch(byte) {
+					case ':':
+						begin_marker = true;
+						pos = 0;
+						printf("[BGN]\n");
+					break;
+					case '\r':
+						printf("[RTN]\n");
+						data_buf[pos] = 0;
+						if (begin_marker) {
+							begin_marker = false;
+							ihex_read_bytes(&ihex, data_buf, strlen(data_buf));
+						}
+
+						data_buf[pos - 1] = 0;
+						printf("[Read][%d][%s]\n", (int) pos, data_buf);
+						pos = 0;
+						break;
+					case '\n':
+						printf("[EOL]\n");
+					break;
+				}
+			}
+			if (upload_state == UPLOAD_ERROR) {
+				uart_handle_upload_error();
+				break;
+			}
+		}
+
+		if (upload_state == UPLOAD_FINISHED) {
+			csclose(code_memory);
+			ihex_end_read(&ihex);
+			javascript_run_code(code_name);
+		}
+
+	}
+}
+
+void uart_rx_renable(void) {
+	uart_irq_rx_enable(dev_upload);
+}
+
+void uart_uploader_init(void) {
+	uint32_t baudrate, dtr = 0;
+	int ret;
+
+	dev_upload = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
+	if (!dev_upload) {
+		printf("CDC ACM device not found\n");
+		return;
+	}
+
+	printf("Wait for DTR\n");
+	while (1) {
+		uart_line_ctrl_get(dev_upload, LINE_CTRL_DTR, &dtr);
+		if (dtr)
+			break;
+	}
+	printf("DTR set, start test\n");
+
+	/* They are optional, we use them to test the interrupt endpoint */
+	ret = uart_line_ctrl_set(dev_upload, LINE_CTRL_DCD, 1);
+	if (ret)
+		printf("Failed to set DCD, ret code %d\n", ret);
+
+	ret = uart_line_ctrl_set(dev_upload, LINE_CTRL_DSR, 1);
+	if (ret)
+		printf("Failed to set DSR, ret code %d\n", ret);
+
+	/* Wait 1 sec for the host to do all settings */
+	sys_thread_busy_wait(1000000);
+
+	ret = uart_line_ctrl_get(dev_upload, LINE_CTRL_BAUD_RATE, &baudrate);
+	if (ret)
+		printf("Failed to get baudrate, ret code %d\n", ret);
+	else
+		printf("Baudrate detected: %d\n", (int)baudrate);
+
+	uart_irq_rx_disable(dev_upload);
+	uart_irq_tx_disable(dev_upload);
+
+	uart_irq_callback_set(dev_upload, interrupt_handler);
+	write_data(dev_upload, banner, strlen(banner));
+
+	/* Enable rx interrupts */
+	uart_irq_rx_enable(dev_upload);
+
+	uart_uploader_runner();
+}
+
