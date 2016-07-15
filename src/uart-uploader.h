@@ -20,5 +20,7 @@ void uart_uploader_init(void);
 void print_acm(const char *buf);
 void uart_rx_renable();
 uint32_t uart_get_baudrate(void);
+uint8_t uart_get_last_state();
+void uart_printbuffer();
 
 #endif

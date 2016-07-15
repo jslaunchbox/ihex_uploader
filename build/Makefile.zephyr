@@ -157,6 +157,9 @@ qemu:	$(EXTERNAL_LIB) $(ZEPHYR_BIN)
 flash:	$(EXTERNAL_LIB) $(OUTPUT)/zephyr/zephyr.strip
 	make -f $(MAKE_FOLDER)/Makefile $(BUILD_CONFIG) flash
 
+debugserver:
+	make -f $(MAKE_FOLDER)/Makefile BOARD=arduino_101 debugserver
+
 dfu-x86: all
 	@- dfu-util -a x86_app -D outdir/$(BOARD)/zephyr/zephyr.bin; \
 	if [ $$? -eq 0 ] ; then echo "\nYour program will launch in 5 seconds." ; \

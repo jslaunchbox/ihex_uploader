@@ -123,6 +123,8 @@ static int shell_acm_command(int argc, char *argv[])
 	}
 
 	if (!strcmp(cmd, "status")) {
+		printf("status %d\n", (int) uart_get_last_state());
+		uart_printbuffer();
 		return 0;
 	}
 	printf("Command unknown\n");
