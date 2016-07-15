@@ -1,0 +1,31 @@
+diff --git a/usb/class/cdc_acm.c b/usb/class/cdc_acm.c
+old mode 100644
+new mode 100755
+index 3497086..8eef51a
+--- a/usb/class/cdc_acm.c
++++ b/usb/class/cdc_acm.c
+@@ -353,11 +353,20 @@ static void cdc_acm_bulk_out(uint8_t ep,
+ 			if (((buf_head + 1) % CDC_ACM_BUFFER_SIZE) ==
+ 			    dev_data->rx_buf_tail) {
+ 				/* FIFO full, discard data */
+-				DBG("CDC buffer full!\n");
+-			} else {
+-				dev_data->rx_buf[buf_head] = tmp_buf[j];
+-				buf_head = (buf_head + 1) % CDC_ACM_BUFFER_SIZE;
++
++				DBG("Flush!\n");
++
++				dev_data->rx_buf_head = buf_head;
++				dev_data->rx_ready = 1;
++				/* Call callback only if rx irq ena */
++				if (dev_data->cb && dev_data->rx_irq_ena)
++					dev_data->cb(cdc_acm_dev);
++
++				//DBG("CDC buffer full!\n");
+ 			}
++
++			dev_data->rx_buf[buf_head] = tmp_buf[j];
++			buf_head = (buf_head + 1) % CDC_ACM_BUFFER_SIZE;
+ 		}
+ 	}
+ 
