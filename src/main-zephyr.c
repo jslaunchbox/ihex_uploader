@@ -104,7 +104,7 @@ static int shell_acm_command(int argc, char *argv[])
 	}
 
 	if (!strcmp(cmd, "init")) {
-		uart_uploader_init();
+		//uart_uploader_init();
 		return 0;
 	}
 
@@ -218,10 +218,6 @@ void main(void)
 	   up background task to process shell input, and that task calls
 	   shell_cmd_handler(), etc. as callbacks. This processing happens in
 	   the infinite loop, so JerryScript doesn't need to be de-initialized. */
-#endif
-
-#ifdef CONFIG_USE_IHEX_UPLOADER
-	uart_uploader_init();
 #endif
 } /* main */
 

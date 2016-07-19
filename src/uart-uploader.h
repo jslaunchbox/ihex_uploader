@@ -16,7 +16,7 @@
 #ifndef __UART_UPLOADER_H__
 #define __UART_UPLOADER_H__
 
-void uart_uploader_init(void);
+void uart_start_fiber(void);
 void print_acm(const char *buf);
 void uart_rx_renable();
 uint32_t uart_get_baudrate(void);

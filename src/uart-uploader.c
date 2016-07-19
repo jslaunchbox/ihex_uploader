@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <malloc.h>
 #include <errno.h>
 #include <ctype.h>
 
@@ -53,10 +54,58 @@
 const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
 const char code_name[] = "test.js";
 
-#define CONFIG_UART_UPLOAD_HANDLER_STACKSIZE 2000
-#define STACKSIZE CONFIG_UART_UPLOAD_HANDLER_STACKSIZE
-static char __stack fiberStack[STACKSIZE];
-static nano_thread_id_t uploader_fiber_id = 0;
+#define MAX_LINE_LEN 16
+#define FIFO_CACHE 3
+struct uart_uploader_input {
+	int _unused;
+	char line[MAX_LINE_LEN + 1];
+};
+
+static struct nano_fifo avail_queue;
+static struct nano_fifo data_queue;
+static uint8_t fifo_size = 0;
+static uint8_t max_fifo_size = 0;
+
+uint32_t alloc_count = 0;
+uint32_t free_count = 0;
+
+struct uart_uploader_input *fifo_get_isr_buffer() {
+	void *data = nano_isr_fifo_get(&avail_queue, TICKS_NONE);
+	if (!data) {
+		data = (void *)malloc(sizeof(struct uart_uploader_input));
+		memset(data, '-', sizeof(struct uart_uploader_input));
+		alloc_count++;
+		fifo_size++;
+		if (fifo_size > max_fifo_size)
+			max_fifo_size = fifo_size;
+	}
+	return (struct uart_uploader_input *) data;
+}
+
+void fifo_recycle_buffer(struct uart_uploader_input *data) {
+	if (fifo_size > FIFO_CACHE) {
+		free(data);
+		fifo_size--;
+		free_count++;
+		return;
+	}
+	nano_task_fifo_put(&avail_queue, data);
+}
+
+void uart_clear(void) {
+	void *data = NULL;
+	do {
+		if (data != NULL)
+			free(data);
+		data = nano_fifo_get(&avail_queue, TICKS_NONE);
+	} while (data);
+
+	do {
+		if (data != NULL)
+			free(data);
+		data = nano_fifo_get(&data_queue, TICKS_NONE);
+	} while (data);
+}
 
 //#define DEBUG_UART
 
@@ -73,6 +122,8 @@ static CODE *code_memory = NULL;
 #define DEL                0x7f
 
 /****************************** IHEX ****************************************/
+
+static bool marker = false;
 
 static struct ihex_state ihex;
 
@@ -114,16 +165,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 static struct device *dev_upload;
 
 static volatile bool data_transmitted;
-static volatile bool data_arrived;
 
-// Ring buffer for the UART
-#define RING_MAX_CHUNK_SIZE 1024
-#define RING_BUFFER_LENGTH RING_MAX_CHUNK_SIZE*1
-
-static char data_buf[RING_BUFFER_LENGTH];
-uint32_t head = 0;   // buffer process head, position where i am reading
-uint32_t tail = 0;   // buffer process tail, where i am writing.
-uint32_t lstart = 0; // line start
 uint32_t bytes_received = 0;
 uint32_t bytes_processed = 0;
 
@@ -135,6 +177,8 @@ enum {
 	UART_FIFO_WAIT,
 	UART_RX_READY,
 	UART_FIFO_READ,
+	UART_FIFO_READ_END,
+	UART_FIFO_READ_FLUSH,
 	UART_FIFO_DATA_PROCESS,
 	UART_RESET_HEAD,
 	UART_POST_RESET,
@@ -147,8 +191,13 @@ enum {
 	UART_TERMINATED
 };
 
-static void interrupt_handler(struct device *dev)
-{
+static struct uart_uploader_input *data = NULL;
+static uint32_t tail = 0;
+static char *buf;
+
+static void interrupt_handler(struct device *dev) {
+	char byte;
+
 	uint32_t bytes_read = 0;
 	uint32_t len = 0;
 
@@ -162,41 +211,57 @@ static void interrupt_handler(struct device *dev)
 		uart_state = UART_TX_READY;
 	}
 
-	if (uart_irq_rx_ready(dev)) {
-		data_arrived = true;
+	while (uart_irq_rx_ready(dev)) {
 		uart_state = UART_RX_READY;
 
-		len = RING_BUFFER_LENGTH - tail;
-		bytes_read = uart_fifo_read(dev_upload, &data_buf[tail], len);
-		tail += bytes_read;
-		bytes_received += bytes_read;
-		if (tail == RING_BUFFER_LENGTH) {
-			uart_state = UART_RESET_TAIL;
-			tail = 0;
+		if (tail == 0) {
+			//printf("[New]\r\n");
+			data = fifo_get_isr_buffer();
+			buf = data->line;
 		}
-		uart_state = UART_FIFO_READ;
-		isr_fiber_wakeup(uploader_fiber_id);
+
+		len = MAX_LINE_LEN - tail;
+		bytes_read = uart_fifo_read(dev_upload, buf, len);
+		bytes_received += bytes_read;
+		tail += bytes_read;
+
+		data->line[tail] = 0;
+		//printf("[%s]\r\n", data->line);
+
+		while (bytes_read > 0) {
+			uart_state = UART_FIFO_READ;
+			byte = *buf;
+			if (tail == MAX_LINE_LEN || byte == '\r' || byte == '\n') {
+				data->line[tail] = 0;
+				uart_state = UART_FIFO_READ_FLUSH;
+				nano_isr_fifo_put(&data_queue, data);
+				data = NULL;
+				tail = 0;
+				break;
+			}
+
+			buf++;
+			bytes_read--;
+		}
+
+		uart_state = UART_FIFO_READ_END;
 	}
 }
 
-static void write_data(const char *buf, int len)
-{
+static void write_data(const char *buf, int len) {
 	struct device *dev = dev_upload;
 	uart_irq_tx_enable(dev);
 	data_transmitted = false;
 	uart_fifo_fill(dev, buf, len);
 }
 
-void print_acm(const char *buf)
-{
+void print_acm(const char *buf) {
 	write_data(buf, strlen(buf));
 	write_data("\r\n", 3);
 }
 
-void nprint(const char *buf, unsigned int size)
-{
+void nprint(const char *buf, unsigned int size) {
 	for (int t = 0; t < size; t++) {
-
 		if (buf[t] == '\r')
 			printf("[CR]");
 
@@ -205,7 +270,8 @@ void nprint(const char *buf, unsigned int size)
 
 		if ((buf[t] == '\r' && buf[t + 1] != '\n') || (buf[t] == '\n' && buf[t - 1] != '\r')) {
 			printf("*\r\n");
-		} else {
+		}
+		else {
 			printf("%c", buf[t]);
 		}
 	}
@@ -224,133 +290,95 @@ uint8_t uart_get_last_state() {
 	return uart_state;
 }
 
-void uart_clear() {
-	lstart = head = tail = 0;
-}
-
-void uart_print_buffer_line(const char *data_buf, uint32_t lstart, uint32_t head) {
-	if (lstart > head) {
-		uint32_t len = RING_BUFFER_LENGTH - lstart;
-		nprint(data_buf + lstart, len);
-		nprint(data_buf, head);
-	}
-	else {
-		nprint(data_buf + lstart, head - lstart);
-	}
-}
-
 void uart_printbuffer() {
-	printf("[Ring buffer] Size %d - Head %d, Tail %d \n",
-		(int)RING_BUFFER_LENGTH, (int)head, (int)tail);
-
+	printf("[Mem] Fifo %d Max Fifo %d Alloc %d Free %d \n",
+		(int)fifo_size, (int)max_fifo_size, (int)alloc_count, (int)free_count);
 	printf("[Data] Received %d Processed %d \n",
 		(int)bytes_received, (int)bytes_processed);
-
+	if (marker)
+		printf("[Marker]\n");
 	printf("[START]\n");
-	uart_print_buffer_line(data_buf, 0, tail);
+	//uart_print_buffer_line(data_buf, 0, tail);
 	printf("[END]\n");
 }
 
-void check_at_command(const char *buf, uint32_t lstart, uint32_t head) {
-	if (buf[lstart] != 'A')
+void check_at_command(const char *buf, uint32_t lstart) {
+	if (lstart == 0)
 		return;
-	if (buf[(lstart + 1) % RING_BUFFER_LENGTH] != 'T')
+
+	if (buf[lstart] != 'T')
+		return;
+	if (buf[lstart - 1] != 'A')
 		return;
 
 	printf("OK\r\n");
 	write_data("OK\r\n", 5);
 }
 
-void uart_uploader_runner(int arg1, int arg2)
-{
-	uint8_t  prev = 0;
-	bool marker = false;
+void uart_uploader_runner(int arg1, int arg2) {
+	static struct uart_uploader_input *data = NULL;
+	char *buf = NULL;
+	uint32_t len = 0;
 
 	while (1) {
 		upload_state = UPLOAD_START;
-		print_acm("[Waiting for data]");
+		printf("[Waiting for data]");
 
 		ihex_begin_read(&ihex);
 		code_memory = csopen(code_name, "w+");
 
-		memset(data_buf, 0, RING_BUFFER_LENGTH);
-
 		while (upload_state != UPLOAD_FINISHED) {
 			uart_state = UART_WAITING;
-			while (tail == head) {
-				// Sleep while we don't have data
-				fiber_sleep(MSEC(60000));
-				if (data_arrived == false) {
-					uart_state = UART_TIMEOUT;
-					printf("[Timeout]\n");
-					uart_printbuffer();
-					uart_clear();
-				}
 
+			while (data == NULL) {
+				//printf("[Wait]\r\n");
+				data = nano_task_fifo_get(&data_queue, TICKS_UNLIMITED);
+				buf = data->line;
+				//printf("[Data]\r\n");
+				len = strlen(buf);
+
+				printf("%s\r\n", buf);
 				// Finished transmiting, disable tx irq
 				if (data_transmitted == true)
 					uart_irq_tx_disable(dev_upload);
-			};
+			}
 
-			data_arrived = false;
-
-			while (head != tail) {
+			while (len-- > 0) {
 				uart_state = UART_FIFO_DATA_PROCESS;
-				uint8_t byte = data_buf[head];
-				//data_buf[head] = '*';
+				char byte = *buf++;
 				//write_data(&byte, 1);
 				bytes_processed++;
 
+				if (marker) {
+					ihex_read_byte(&ihex, byte);
+				}
+
 				switch (byte) {
-				case ':':
-					//write_data("[MK]", 4);
-					lstart = head;
-					marker = true;
-					break;
-				case '\r':
-					if (!marker) {
-						check_at_command(data_buf, lstart, head);
-					}
-					write_data("[CR]", 4);
-				case '\n':
-					write_data("[IF]", 4);
-					//uart_print_buffer_line(data_buf, lstart, head);
-					//printf("\n");
-					if (marker) {
-						printf("[EOM] %d - %d - %d \n", (int) lstart, (int) head, (int)tail);
-						//uart_print_buffer_line(data_buf, lstart, head);
-						if (lstart > head) {
-							ihex_read_bytes(&ihex, data_buf + lstart, RING_BUFFER_LENGTH - lstart);
-							ihex_read_bytes(&ihex, data_buf, head);
+					case ':':
+						//write_data("[MK]", 4);
+						printf("<MK>");
+						ihex_read_byte(&ihex, byte);
+						marker = true;
+						break;
+					case '\r':
+						if (!marker) {
+							check_at_command(buf, data->line - buf);
 						}
-						else {
-							ihex_read_bytes(&ihex, data_buf + lstart, head - lstart);
-						}
-
-						//printf("[B]");
-						//uart_print_buffer_line(data_buf, lstart, head);
-						//printf("[E]");
 						marker = false;
-					} else {
-						//write_data("[CR]",4);
-						//uart_print_buffer_line(data_buf, lstart, head);
-					}
-
-					lstart = head + 1;
-					break;
+						printf("<CR>");
+						break;
+						//write_data("[CR]", 4);
+					case '\n':
+						marker = false;
+						printf("<IF>");
+						//write_data("[IF]", 4);
+						break;
 				}
-
-				prev = byte;
-				head++;
-				if (head == RING_BUFFER_LENGTH) {
-					uart_state = UART_RESET_HEAD;
-					head = 0;
-				}
-				uart_state = UART_POST_RESET;
 			}
 
-			uart_irq_rx_enable(dev_upload);
-			uart_state = UART_PROCESS_ENDED;
+			//printf("[Recycle]\r\n");
+			fifo_recycle_buffer(data);
+			data = NULL;
 
 			if (upload_state == UPLOAD_ERROR) {
 				uart_handle_upload_error();
@@ -404,15 +432,18 @@ uint32_t uart_get_baudrate(void) {
 	return baudrate;
 }
 
-void uart_uploader_init(void) {
+void acm() {
 	uint32_t dtr = 0;
 	int ret;
 
 	dev_upload = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
 	if (!dev_upload) {
-		printf("CDC ACM device not found\n");
-		return;
+		printf("CDC [%s] ACM device not found\n", CONFIG_CDC_ACM_PORT_NAME);
+		return -1;
 	}
+
+	nano_fifo_init(&data_queue);
+	nano_fifo_init(&avail_queue);
 
 	printf("Wait for DTR\n");
 	while (1) {
@@ -445,6 +476,6 @@ void uart_uploader_init(void) {
 	/* Enable rx interrupts */
 	uart_irq_rx_enable(dev_upload);
 
-	uploader_fiber_id = task_fiber_start(fiberStack, STACKSIZE, uart_uploader_runner, 0, 0, 3, 0);
+	uart_uploader_runner(0, 0);
 	printf("Init finished\n");
 }
