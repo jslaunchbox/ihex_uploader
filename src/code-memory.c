@@ -37,6 +37,13 @@
 
 static struct code_memory memory_code;
 
+// Save into flash
+/*
+int qm_flash_page_write(const qm_flash_t flash, const qm_flash_region_t region,
+	uint32_t page_num, const uint32_t *const data,
+	uint32_t len)
+*/
+
 CODE *csopen(const char * filename, const char * mode) {
 	memory_code.curoff = 0;
 	memory_code.curend = 0;

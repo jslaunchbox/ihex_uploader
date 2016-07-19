@@ -118,7 +118,7 @@ static volatile bool data_arrived;
 
 // Ring buffer for the UART
 #define RING_MAX_CHUNK_SIZE 1024
-#define RING_BUFFER_LENGTH RING_MAX_CHUNK_SIZE*4
+#define RING_BUFFER_LENGTH RING_MAX_CHUNK_SIZE*1
 
 static char data_buf[RING_BUFFER_LENGTH];
 uint32_t head = 0;   // buffer process head, position where i am reading
@@ -196,10 +196,16 @@ void print_acm(const char *buf)
 void nprint(const char *buf, unsigned int size)
 {
 	for (int t = 0; t < size; t++) {
+
+		if (buf[t] == '\r')
+			printf("[CR]");
+
+		if (buf[t] == '\n')
+			printf("[IF]");
+
 		if ((buf[t] == '\r' && buf[t + 1] != '\n') || (buf[t] == '\n' && buf[t - 1] != '\r')) {
 			printf("*\r\n");
-		}
-		else {
+		} else {
 			printf("%c", buf[t]);
 		}
 	}
@@ -243,6 +249,16 @@ void uart_printbuffer() {
 	printf("[START]\n");
 	uart_print_buffer_line(data_buf, 0, tail);
 	printf("[END]\n");
+}
+
+void check_at_command(const char *buf, uint32_t lstart, uint32_t head) {
+	if (buf[lstart] != 'A')
+		return;
+	if (buf[(lstart + 1) % RING_BUFFER_LENGTH] != 'T')
+		return;
+
+	printf("OK\r\n");
+	write_data("OK\r\n", 5);
 }
 
 void uart_uploader_runner(int arg1, int arg2)
@@ -292,9 +308,12 @@ void uart_uploader_runner(int arg1, int arg2)
 					marker = true;
 					break;
 				case '\r':
-					//write_data("[CR]", 4);
+					if (!marker) {
+						check_at_command(data_buf, lstart, head);
+					}
+					write_data("[CR]", 4);
 				case '\n':
-					//write_data("[IF]", 4);
+					write_data("[IF]", 4);
 					//uart_print_buffer_line(data_buf, lstart, head);
 					//printf("\n");
 					if (marker) {
