@@ -18,7 +18,7 @@
 #include <stdlib.h>
 
 #include <zephyr.h>
-#include <misc/printk.h>
+//#include <misc/printk.h>
 #include <misc/shell.h>
 
 #include "jerry-api.h"
@@ -27,14 +27,6 @@
 
 #define CONFIG_USE_JS_SHELL
 #define CONFIG_USE_IHEX_UPLOADER
-
-#if defined (CONFIG_STDOUT_CONSOLE)
-#include <stdio.h>
-#define PRINT       printf
-#else
-#include <misc/printk.h>
-#define PRINT       printk
-#endif
 
  /**
   * Jerryscript simple test loop
@@ -83,9 +75,9 @@ static int shell_cmd_version(int argc, char *argv[])
 
 	printf("Jerryscript API %d.%d\n", JERRY_API_MAJOR_VERSION, JERRY_API_MINOR_VERSION);
 
-	printk("Zephyr version %d.%d.%d\n", SYS_KERNEL_VER_MAJOR(version),
-		SYS_KERNEL_VER_MINOR(version),
-		SYS_KERNEL_VER_PATCHLEVEL(version));
+	printf("Zephyr version %d.%d.%d\n", (int) SYS_KERNEL_VER_MAJOR(version),
+		(int) SYS_KERNEL_VER_MINOR(version),
+		(int) SYS_KERNEL_VER_PATCHLEVEL(version));
 	return 0;
 } /* shell_cmd_version */
 
@@ -128,13 +120,19 @@ static int shell_acm_command(int argc, char *argv[])
 	}
 
 	if (!strcmp(cmd, "status")) {
-		printf("status %d\n", (int) uart_get_last_state());
-		uart_printbuffer();
+		uart_print_status();
 		return 0;
 	}
 	printf("Command unknown\n");
 	return 0;
 } /* shell_acm_command */
+
+static int shell_clear_command(int argc, char *argv[])
+{
+	printf("\x1b[2J\x1b[H");
+	fflush(stdout);
+	return 0;
+}
 
 static int shell_cmd_test(int argc, char *argv[])
 {
@@ -197,6 +195,7 @@ static int shell_cmd_handler(int argc, char *argv[])
 
 const struct shell_cmd commands[] =
 {
+  SHELL_COMMAND("clear", shell_clear_command),
   SHELL_COMMAND("syntax", shell_cmd_syntax_help),
   SHELL_COMMAND("version", shell_cmd_version),
   SHELL_COMMAND("test", shell_cmd_test),
@@ -209,11 +208,12 @@ const struct shell_cmd commands[] =
 
 void main(void)
 {
+	shell_clear_command(0, 0);
 #ifdef CONFIG_USE_JS_SHELL
 	jerry_init(JERRY_INIT_EMPTY);
 	printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
 	shell_register_app_cmd_handler(shell_cmd_handler);
-	shell_init("js> ", commands);
+	shell_init("\x1b[32mjs>\x1b[39m ", commands);
 	/* Don't call jerry_cleanup() here, as shell_init() returns after setting
 	   up background task to process shell input, and that task calls
 	   shell_cmd_handler(), etc. as callbacks. This processing happens in

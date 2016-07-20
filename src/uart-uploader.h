@@ -16,12 +16,11 @@
 #ifndef __UART_UPLOADER_H__
 #define __UART_UPLOADER_H__
 
-void uart_start_fiber(void);
 void print_acm(const char *buf);
 void uart_rx_renable();
 uint32_t uart_get_baudrate(void);
 uint8_t uart_get_last_state();
-void uart_printbuffer();
+void uart_print_status();
 void uart_clear();
 
 #endif
