@@ -24,4 +24,5 @@ obj-y += uart-uploader.o
 
 obj-y += code-memory.o
 obj-y += jerry-code.o
+obj-y += acm-shell.o
 obj-y += ../deps/ihex/kk_ihex_read.o

@@ -33,7 +33,6 @@
 #include <init.h>
 
 #include "code-memory.h"
-#include "ihex/kk_ihex_read.h"
 
 static struct code_memory memory_code;
 

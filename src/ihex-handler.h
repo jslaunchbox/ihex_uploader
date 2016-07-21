@@ -16,22 +16,6 @@
 #ifndef __UART_UPLOADER_H__
 #define __UART_UPLOADER_H__
 
- /* Configuration of the CDC-ACM Device send to the USB Driver */
-static struct uploader_cfg_data uploader_config = {
-	.cb_status = NULL,
-	.interface = {
-		.process_init = NULL,
-		.custom_handler = NULL,
-		.process_data = NULL,
-		.process_has_finish = NULL,
-		.process_finish = NULL,
-	}
-};
-
 void print_acm(const char *buf);
-uint32_t uart_get_baudrate(void);
-uint8_t uart_get_last_state();
-void uart_print_status();
-void uart_clear();
 
 #endif

@@ -65,7 +65,6 @@
 #endif /* CONFIG_IHEX_UPLOADER_DEBUG */
 
 const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
-const char code_name[] = "test.js";
 
 #define MAX_LINE_LEN 16
 #define FIFO_CACHE 2
@@ -118,51 +117,6 @@ void uart_clear(void) {
 			free(data);
 		data = nano_fifo_get(&data_queue, TICKS_NONE);
 	} while (data);
-}
-
-/*
- * Contains the pointer to the memory where the code will be uploaded
- * using the stub interface at code_memory.c
- */
-static CODE *code_memory = NULL;
-
-/****************************** IHEX ****************************************/
-
-static bool marker = false;
-
-static struct ihex_state ihex;
-
-static int8_t upload_state = 0;
-#define UPLOAD_START       0
-#define UPLOAD_IN_PROGRESS 1
-#define UPLOAD_FINISHED    2
-#define UPLOAD_ERROR       -1
-
-/* Data received from the buffer */
-ihex_bool_t ihex_data_read(struct ihex_state *ihex,
-	ihex_record_type_t type,
-	ihex_bool_t checksum_error) {
-	if (checksum_error) {
-		upload_state = UPLOAD_ERROR;
-		printf("[ERR] Checksum_error\n");
-		return false;
-	};
-
-	if (type == IHEX_DATA_RECORD) {
-		upload_state = UPLOAD_IN_PROGRESS;
-		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
-		ihex->data[ihex->length] = 0;
-
-		DBG("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
-
-		csseek(code_memory, address, SEEK_SET);
-		cswrite(ihex->data, ihex->length, 1, code_memory);
-	}
-	else if (type == IHEX_END_OF_FILE_RECORD) {
-		print_acm("[EOF]");
-		upload_state = UPLOAD_FINISHED;
-	}
-	return true;
 }
 
 /**************************** UART CAPTURE **********************************/
@@ -329,34 +283,7 @@ void uart_ihex_runner() {
 					uart_irq_tx_disable(dev_upload);
 			}
 
-			while (len-- > 0) {
-				uart_state = UART_FIFO_DATA_PROCESS;
-				char byte = *buf++;
-#ifdef CONFIG_IHEX_UPLOADER_DEBUG
-				write_data(&byte, 1);
-#endif
-				bytes_processed++;
-
-				if (marker) {
-					ihex_read_byte(&ihex, byte);
-				}
-
-				switch (byte) {
-					case ':':
-						DBG("<MK>");
-						ihex_read_byte(&ihex, byte);
-						marker = true;
-						break;
-					case '\r':
-						marker = false;
-						DBG("<CR>");
-						break;
-					case '\n':
-						marker = false;
-						DBG("<IF>");
-						break;
-				}
-			}
+			bytes_processed += process_data(buf, len);
 
 			DBG("[Recycle]\n");
 			fifo_recycle_buffer(data);

@@ -154,18 +154,17 @@ Help will provide a list of commands
 
 This program, is built in top of the Zephyr command line, so there is a limit of 10 spaces.
 
-## 7. USB serial terminal commands
----
+# 2. USB serial terminal commands
 
-### Setters
+## Setters
 
-#### Filename
+### Filename
 Set the destination filename where to store the code to run.
 ```
 set filename <filename>
 ```
 
-#### Data transfer
+### Data transfer
 Set the mode to accept data when the transmision starts
 1. Raw data 
 Will be plain text that contains the code. No CRC or error checking. 
@@ -184,19 +183,19 @@ set transfer raw
 set transfer snapshot
 ```
 
-#### Getters
+### Getters
 
 ```
 get filedata <filename>
 ```
 
-#### States
+### States
 
 ``` 
 use filename <filename>
 ``` 
 
-#### Transactions
+### Transactions
 
 ``` 
 begin transaction
@@ -204,13 +203,13 @@ begin transaction
 end transaction
 ``` 
 
-#### System
+### System
 
 ``` 
 bluetooth connect / disconnect / list
 ``` 
 
-#### Execution and flow
+### Execution and flow
 
 Parse the code specified on the 'use' command to check for errors
 ``` 
