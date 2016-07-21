@@ -234,8 +234,9 @@ static void interrupt_handler(struct device *dev) {
 		//printf("[%s]\r\n", data->line);
 
 		bool flush = false;
-		if (tail == MAX_LINE_LEN || (!uart_irq_rx_ready(dev) && bytes_read > 4))
+		if (tail == MAX_LINE_LEN || (!uart_irq_rx_ready(dev) && bytes_read > 4)) {
 			flush = true;
+		}
 
 		uart_state = UART_FIFO_READ;
 		while (bytes_read-- > 0) {
@@ -285,20 +286,21 @@ void uart_print_status() {
 	printf("******* SYSTEM STATE ********\n");
 	if (code_memory != NULL) {
 		printf("[CODE START]\n");
-		printf(code_memory);
+		printf((char *) code_memory);
 		printf("[CODE END]\n");
 	}
 
 	printf("[State] %d\n", (int)uart_get_last_state());
 	printf("[Mem] Fifo %d Max Fifo %d Alloc %d Free %d \n",
 		(int)fifo_size, (int)max_fifo_size, (int)alloc_count, (int)free_count);
+	printf("Max fifo %d bytes\n", (int) (max_fifo_size*sizeof(struct uart_uploader_input)));
 	printf("[Data] Received %d Processed %d \n",
 		(int)bytes_received, (int)bytes_processed);
 	if (marker)
 		printf("[Marker]\n");
 }
 
-void uart_uploader_runner(int arg1, int arg2) {
+void uart_ihex_runner() {
 	static struct uart_uploader_input *data = NULL;
 	char *buf = NULL;
 	uint32_t len = 0;
@@ -371,33 +373,14 @@ void uart_uploader_runner(int arg1, int arg2) {
 			csclose(code_memory);
 			ihex_end_read(&ihex);
 			javascript_run_code(code_name);
+			printf("[CLOSE]\n");
+			return;
 		}
 
 	}
 
 	// Not possible
 	uart_state = UART_TERMINATED;
-}
-
-void uart_rx_renable(void) {
-	printf("Renable acm\n");
-
-	dev_upload = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
-	if (!dev_upload) {
-		printf("CDC ACM device not found\n");
-		return;
-	}
-
-	uart_get_baudrate();
-
-	uart_irq_rx_disable(dev_upload);
-	uart_irq_tx_disable(dev_upload);
-
-	uart_irq_callback_set(dev_upload, interrupt_handler);
-	write_data(banner, strlen(banner));
-
-	/* Enable rx interrupts */
-	uart_irq_rx_enable(dev_upload);
 }
 
 uint32_t uart_get_baudrate(void) {
@@ -412,6 +395,11 @@ uint32_t uart_get_baudrate(void) {
 	return baudrate;
 }
 
+void uart_uploader_runner(int arg1, int arg2) {
+	uart_ihex_runner();
+}
+
+/* ACM TASK */
 void acm() {
 	uint32_t dtr = 0;
 	int ret;
@@ -443,6 +431,7 @@ void acm() {
 		printf("DSR Failed %d\n", ret);
 
 	/* Wait 1 sec for the host to do all settings */
+	printf("Start\n");
 	sys_thread_busy_wait(1000000);
 
 	uart_get_baudrate();

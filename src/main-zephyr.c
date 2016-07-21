@@ -18,7 +18,6 @@
 #include <stdlib.h>
 
 #include <zephyr.h>
-//#include <misc/printk.h>
 #include <misc/shell.h>
 
 #include "jerry-api.h"
@@ -89,16 +88,6 @@ static int shell_acm_command(int argc, char *argv[])
 	char *cmd = argv[1];
 
 	printf("[ACM] %s\n",cmd);
-
-	if (!strcmp(cmd, "renable")) {
-		uart_rx_renable();
-		return 0;
-	}
-
-	if (!strcmp(cmd, "init")) {
-		//uart_uploader_init();
-		return 0;
-	}
 
 	if (!strcmp(cmd, "get_baudrate")) {
 		uart_get_baudrate();
@@ -208,9 +197,9 @@ const struct shell_cmd commands[] =
 
 void main(void)
 {
-	shell_clear_command(0, 0);
 #ifdef CONFIG_USE_JS_SHELL
 	jerry_init(JERRY_INIT_EMPTY);
+	shell_clear_command(0, 0);
 	printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
 	shell_register_app_cmd_handler(shell_cmd_handler);
 	shell_init("\x1b[32mjs>\x1b[39m ", commands);

@@ -5,9 +5,9 @@ run on a number of supported boards (like
 [Arduino 101 / Genuino 101](https://www.arduino.cc/en/Main/ArduinoBoard101),
 [Zephyr Arduino 101](https://www.zephyrproject.org/doc/board/arduino_101.html)).
 
-### How to build
+# How to build
 
-#### 1. Preface
+## 1. Preface
 
 1. Directory structure
 
@@ -36,9 +36,9 @@ harmony
 
 2. Target boards/emulations
 
-Following Zephyr boards were tested: qemu_x86, qemy_cortex_m3, arduino_101.
+Following Zephyr boards were tested: qemu_x86, arduino_101.
 
-#### 2. Prepare Zephyr
+## 2. Prepare Zephyr
 
 Follow [this](https://www.zephyrproject.org/doc/getting_started/getting_started.html) page to get
 the Zephyr source and configure the environment.
@@ -57,7 +57,7 @@ export ZEPHYR_GCC_VARIANT=zephyr
 export ZEPHYR_SDK_INSTALL_DIR=<sdk installation directory>
 ```
 
-#### 3. Build JerryScript for Zephyr
+## 3. Build JerryScript for Zephyr
 
 The easiest way is to build and run on a QEMU emulator:
 
@@ -67,18 +67,12 @@ For x86 architecture:
 make -f ./build/Makefile.zephyr BOARD=qemu_x86 qemu
 ```
 
-For ARM (Cortex-M) architecture:
-
-```
-make -f ./build/Makefile.zephyr BOARD=qemu_cortex_m3 qemu
-```
-
-#### 4. Build for Arduino 101
+## 4. Build for Arduino 101
 
 ```
 # assume you are in harmony folder
 cd jerry
-make -f ./targets/zephyr/Makefile.zephyr BOARD=arduino_101_factory
+make -f ./targets/zephyr/Makefile.zephyr
 ```
 
 This will generate the following libraries:
@@ -93,7 +87,7 @@ The final Zephyr image will be located here:
 ./outdir/arduino_101_factory/zephyr/zephyr.elf
 ```
 
-#### 5. Flashing
+## 5. Flashing
 
 Details on how to flash the image can be found here:
 [Flashing image](https://www.zephyrproject.org/doc/board/arduino_101.html)
@@ -111,7 +105,7 @@ make -f ./build/Makefile.zephyr clean
 - Not using a Jtag and having a factory stock Arduino 101.
 
 ```
-make -f ./build/Makefile.zephyr BOARD=arduino_101_factory
+make -f ./build/Makefile.zephyr
 ```
 
 Follow the Zephyr instructions to flash using the dfu-util command.
@@ -123,11 +117,11 @@ There is a helper function to flash using the JTAG and Flywatter2
 
 ![alt tag](docs/arduino_101.jpg?raw=true "Example")
 ```
-make -f ./build/Makefile.zephyr BOARD=arduino_101_factory flash
+make -f ./build/Makefile.zephyr flash
 
 ```
 
-#### 6. Serial terminal
+## 6. Serial terminal
 
 Test a command line in a serial terminal.
 
@@ -159,3 +153,76 @@ Help will provide a list of commands
 ```
 
 This program, is built in top of the Zephyr command line, so there is a limit of 10 spaces.
+
+## 7. USB serial terminal commands
+---
+
+### Setters
+
+#### Filename
+Set the destination filename where to store the code to run.
+```
+set filename <filename>
+```
+
+#### Data transfer
+Set the mode to accept data when the transmision starts
+1. Raw data 
+Will be plain text that contains the code. No CRC or error checking. 
+After the transmission is finished you can parse or run the code.
+
+2. Intel Hex 
+Basic CRC, hexadecimal data with data sections and regions.
+It might be that the code is splitted in sections and you will only update a section of the memory.
+
+3. Snapshot 
+Binary format in IntelHex that will be stored on the filename.
+
+```
+set transfer ihex
+set transfer raw
+set transfer snapshot
+```
+
+#### Getters
+
+```
+get filedata <filename>
+```
+
+#### States
+
+``` 
+use filename <filename>
+``` 
+
+#### Transactions
+
+``` 
+begin transaction
+<some data transfer>
+end transaction
+``` 
+
+#### System
+
+``` 
+bluetooth connect / disconnect / list
+``` 
+
+#### Execution and flow
+
+Parse the code specified on the 'use' command to check for errors
+``` 
+parse 
+``` 
+
+Run the code specified on the 'use' command
+```
+run 
+``` 
+
+Launches a debug server to step into the jerryscript code
+``` 
+debug server
+``` 
