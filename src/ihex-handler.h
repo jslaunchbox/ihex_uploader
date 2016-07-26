@@ -13,9 +13,8 @@
  * limitations under the License.
  */
 
-#ifndef __UART_UPLOADER_H__
-#define __UART_UPLOADER_H__
+#ifndef __IHEX_HANDLER_H__
+#define __IHEX_HANDLER_H__
 
-void print_acm(const char *buf);
 
 #endif

@@ -16,13 +16,11 @@
 
 /**
 * @file
-* @brief UART-driven uploader
+* @brief Intel Hex handler
 *
 * Reads a program from the uart using Intel HEX format.
-*
 * Designed to be used from Javascript or a ECMAScript object file.
-*
-* Hooks into the printk and fputc (for printf) modules. Poll driven.
+
 */
 
 #include <nanokernel.h>
@@ -39,8 +37,6 @@
 #include <device.h>
 #include <init.h>
 
-#include <board.h>
-#include <uart.h>
 #include <toolchain.h>
 #include <sections.h>
 #include <atomic.h>
@@ -69,7 +65,9 @@
  * using the stub interface at code_memory.c
  */
 static CODE *code_memory = NULL;
-static const char code_name[] = "ihex.js";
+
+/* Filename where to store this data */
+static char *code_name;
 
 /****************************** IHEX ****************************************/
 
@@ -113,21 +111,30 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 /*
 * Negotiate a re-upload
 */
-
-void uart_handle_upload_error() {
+void ihex_process_error(uint32_t error) {
 	printf("[Download Error]\n");
 }
 
 /*
 * Capture for the Intel Hex parser
 */
-uint32_t process_init() {
+uint32_t ihex_process_init(const char *filename) {
+	upload_state = UPLOAD_START;
 	printf("[RDY]\n");
 	ihex_begin_read(&ihex);
+
+	code_name = filename;
 	code_memory = csopen(code_name, "w+");
+
+	// Error getting an id for our data storage
+	if (!code_memory) {
+		upload_state == UPLOAD_ERROR;
+	}
+
+	return (!code_memory);
 }
 
-uint32_t process_data(const char *buf, uint32_t len) {
+uint32_t ihex_process_data(const char *buf, uint32_t len) {
 	uint32_t processed = 0;
 	while (len-- > 0) {
 		processed++;
@@ -158,13 +165,18 @@ uint32_t process_data(const char *buf, uint32_t len) {
 	return processed;
 }
 
-bool ihex_process_is_finish() {
-	return (upload_state == UPLOAD_FINISHED);
+bool ihex_process_is_done() {
+	return (upload_state == UPLOAD_FINISHED || upload_state == UPLOAD_ERROR);
 }
 
 uint32_t ihex_process_finish() {
+	if (upload_state == UPLOAD_ERROR) {
+		printf("[Error] Callback handle error \n");
+		return 1;
+	}
+
 	if (upload_state != UPLOAD_FINISHED)
-		return;
+		return 1;
 
 	printf("[EOF]\n");
 	csclose(code_memory);
@@ -172,4 +184,29 @@ uint32_t ihex_process_finish() {
 	javascript_run_code(code_name);
 	printf("[CLOSE]\n");
 	return 0;
+}
+
+void ihex_print_status() {
+	if (code_memory != NULL) {
+		printf("[CODE START]\n");
+		printf((char *)code_memory);
+		printf("[CODE END]\n");
+	}
+
+	if (marker)
+		printf("[Marker]\n");
+}
+
+void ihex_process_start() {
+	struct uploader_cfg_data cfg;
+
+	cfg.cb_status = NULL;
+	cfg.interface.init_cb = ihex_process_init;
+	cfg.interface.error_cb = ihex_process_error;
+	cfg.interface.is_done = ihex_process_is_done;
+	cfg.interface.close_cb = ihex_process_finish;
+	cfg.interface.process_cb = ihex_process_data;
+	cfg.print_state = ihex_print_status;
+
+	process_set_config(&cfg);
 }

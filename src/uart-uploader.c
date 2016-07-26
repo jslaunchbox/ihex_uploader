@@ -68,6 +68,22 @@ const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
 
 #define MAX_LINE_LEN 16
 #define FIFO_CACHE 2
+
+/* Configuration of the callbacks to be called */
+static struct uploader_cfg_data uploader_config = {
+	.filename = NULL,
+	/** Callback to be notified on connection status change */
+	.cb_status = NULL,
+	.interface = {
+		.init_cb = NULL,
+		.close_cb = NULL,
+		.process_cb = NULL,
+		.error_cb = NULL,
+		.is_done = NULL
+	},
+	.print_state = NULL
+};
+
 struct uart_uploader_input {
 	int _unused;
 	char line[MAX_LINE_LEN + 1];
@@ -147,6 +163,7 @@ enum {
 	UART_BUFFER_PROCESS_OVERFLOW,
 	UART_WAITING,
 	UART_TIMEOUT,
+	UART_CLOSE,
 	UART_TERMINATED
 };
 
@@ -224,12 +241,9 @@ void print_acm(const char *buf) {
 }
 
 /**************************** DEVICE **********************************/
-/*
-* Negotiate a re-upload
-*/
 
-void uart_handle_upload_error() {
-	printf("[Download Error]\n");
+void process_set_config(struct uploader_cfg_data *config) {
+	memcpy(&uploader_config, config, sizeof(struct uploader_cfg_data));
 }
 
 uint8_t uart_get_last_state() {
@@ -238,11 +252,9 @@ uint8_t uart_get_last_state() {
 
 void uart_print_status() {
 	printf("******* SYSTEM STATE ********\n");
-	if (code_memory != NULL) {
-		printf("[CODE START]\n");
-		printf((char *) code_memory);
-		printf("[CODE END]\n");
-	}
+
+	if (uploader_config.print_state != NULL)
+		uploader_config.print_state();
 
 	printf("[State] %d\n", (int)uart_get_last_state());
 	printf("[Mem] Fifo %d Max Fifo %d Alloc %d Free %d \n",
@@ -250,23 +262,19 @@ void uart_print_status() {
 	printf("Max fifo %d bytes\n", (int) (max_fifo_size*sizeof(struct uart_uploader_input)));
 	printf("[Data] Received %d Processed %d \n",
 		(int)bytes_received, (int)bytes_processed);
-	if (marker)
-		printf("[Marker]\n");
 }
 
-void uart_ihex_runner() {
+void uart_uploader_runner(int arg1, int arg2) {
 	static struct uart_uploader_input *data = NULL;
 	char *buf = NULL;
 	uint32_t len = 0;
 
 	while (1) {
-		upload_state = UPLOAD_START;
-		printf("[RDY]\n");
+		uart_state = UART_INIT;
+		if (uploader_config.interface.init_cb!=NULL)
+			uploader_config.interface.init_cb();
 
-		ihex_begin_read(&ihex);
-		code_memory = csopen(code_name, "w+");
-
-		while (upload_state != UPLOAD_FINISHED) {
+		while (!uploader_config.interface.is_done()) {
 			uart_state = UART_WAITING;
 
 			while (data == NULL) {
@@ -283,27 +291,16 @@ void uart_ihex_runner() {
 					uart_irq_tx_disable(dev_upload);
 			}
 
-			bytes_processed += process_data(buf, len);
+			bytes_processed += uploader_config.interface.process_cb(buf, len);
 
 			DBG("[Recycle]\n");
 			fifo_recycle_buffer(data);
 			data = NULL;
-
-			if (upload_state == UPLOAD_ERROR) {
-				uart_handle_upload_error();
-				break;
-			}
 		}
 
-		if (upload_state == UPLOAD_FINISHED) {
-			printf("[EOF]\n");
-			csclose(code_memory);
-			ihex_end_read(&ihex);
-			javascript_run_code(code_name);
-			printf("[CLOSE]\n");
-			return;
-		}
-
+		uart_state = UART_CLOSE;
+		if (uploader_config.interface.close_cb != NULL)
+			uploader_config.interface.close_cb();
 	}
 
 	// Not possible
@@ -320,10 +317,6 @@ uint32_t uart_get_baudrate(void) {
 		printf("Baudrate %d\n", (int)baudrate);
 
 	return baudrate;
-}
-
-void uart_uploader_runner(int arg1, int arg2) {
-	uart_ihex_runner();
 }
 
 /* ACM TASK */
