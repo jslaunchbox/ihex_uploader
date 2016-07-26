@@ -67,7 +67,7 @@
 static CODE *code_memory = NULL;
 
 /* Filename where to store this data */
-static char *code_name;
+static const char *code_name;
 
 /****************************** IHEX ****************************************/
 
@@ -128,7 +128,7 @@ uint32_t ihex_process_init(const char *filename) {
 
 	// Error getting an id for our data storage
 	if (!code_memory) {
-		upload_state == UPLOAD_ERROR;
+		upload_state = UPLOAD_ERROR;
 	}
 
 	return (!code_memory);

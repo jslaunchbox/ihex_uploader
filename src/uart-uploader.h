@@ -19,7 +19,7 @@
  /**
  * Callback function initialize the process
  */
-typedef void(*process_init_callback)();
+typedef uint32_t(*process_init_callback)(const char *filename);
 
 /**
 * Callback function to pass an error from the transmision

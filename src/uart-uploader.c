@@ -65,13 +65,14 @@
 #endif /* CONFIG_IHEX_UPLOADER_DEBUG */
 
 const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
+const char filename[] = "jerry.js";
 
 #define MAX_LINE_LEN 16
 #define FIFO_CACHE 2
 
 /* Configuration of the callbacks to be called */
 static struct uploader_cfg_data uploader_config = {
-	.filename = NULL,
+	.filename = filename,
 	/** Callback to be notified on connection status change */
 	.cb_status = NULL,
 	.interface = {
@@ -259,7 +260,7 @@ void uart_print_status() {
 	printf("[State] %d\n", (int)uart_get_last_state());
 	printf("[Mem] Fifo %d Max Fifo %d Alloc %d Free %d \n",
 		(int)fifo_size, (int)max_fifo_size, (int)alloc_count, (int)free_count);
-	printf("Max fifo %d bytes\n", (int) (max_fifo_size*sizeof(struct uart_uploader_input)));
+	printf("Max fifo %d bytes\n", (int)(max_fifo_size * sizeof(struct uart_uploader_input)));
 	printf("[Data] Received %d Processed %d \n",
 		(int)bytes_received, (int)bytes_processed);
 }
@@ -271,8 +272,8 @@ void uart_uploader_runner(int arg1, int arg2) {
 
 	while (1) {
 		uart_state = UART_INIT;
-		if (uploader_config.interface.init_cb!=NULL)
-			uploader_config.interface.init_cb();
+		if (uploader_config.interface.init_cb != NULL)
+			uploader_config.interface.init_cb(uploader_config.filename);
 
 		while (!uploader_config.interface.is_done()) {
 			uart_state = UART_WAITING;
