@@ -48,6 +48,8 @@
 #include "uart-uploader.h"
 #include "ihex/kk_ihex_read.h"
 
+#define CONFIG_IHEX_UPLOADER_DEBUG
+
 #ifndef CONFIG_IHEX_UPLOADER_DEBUG
 #define DBG(...) { ; }
 #else
@@ -101,7 +103,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		cswrite(ihex->data, ihex->length, 1, code_memory);
 	}
 	else if (type == IHEX_END_OF_FILE_RECORD) {
-		print_acm("[EOF]");
+		acm_println("[EOF]");
 		upload_state = UPLOAD_FINISHED;
 	}
 	return true;
@@ -140,7 +142,7 @@ uint32_t ihex_process_data(const char *buf, uint32_t len) {
 		processed++;
 		char byte = *buf++;
 #ifdef CONFIG_IHEX_UPLOADER_DEBUG
-		write_data(&byte, 1);
+		acm_write(&byte, 1);
 #endif
 		if (marker) {
 			ihex_read_byte(&ihex, byte);

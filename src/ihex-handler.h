@@ -16,5 +16,6 @@
 #ifndef __IHEX_HANDLER_H__
 #define __IHEX_HANDLER_H__
 
+void ihex_process_start();
 
 #endif

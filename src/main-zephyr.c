@@ -23,6 +23,7 @@
 #include "jerry-api.h"
 
 #include "uart-uploader.h"
+#include "ihex-handler.h"
 
 #define CONFIG_USE_JS_SHELL
 #define CONFIG_USE_IHEX_UPLOADER
@@ -101,10 +102,11 @@ static int shell_acm_command(int argc, char *argv[])
 
 	if (!strcmp(cmd, "print")) {
 		for (int t = 2; t < argc; t++) {
-			if (t>2) print_acm(" ");
-			print_acm(argv[t]);
+			if (t>2)
+				acm_write(" ",2);
+			acm_write(argv[t], strlen(argv[t]));
 		}
-		print_acm("\r\n");
+		acm_write("\r\n", 3);
 		return 0;
 	}
 
@@ -208,5 +210,7 @@ void main(void)
 	   shell_cmd_handler(), etc. as callbacks. This processing happens in
 	   the infinite loop, so JerryScript doesn't need to be de-initialized. */
 #endif
+
+	ihex_process_start();
 } /* main */
 

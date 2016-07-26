@@ -64,6 +64,9 @@
 #endif /* CONFIG_STDOUT_CONSOLE */
 #endif /* CONFIG_IHEX_UPLOADER_DEBUG */
 
+#undef DBG
+#define DBG printk
+
 const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
 const char filename[] = "jerry.js";
 
@@ -217,6 +220,8 @@ static void interrupt_handler(struct device *dev) {
 				flush = true;
 		}
 
+		uart_state = UART_FIFO_READ_END;
+
 		if (flush) {
 			data->line[tail] = 0;
 			uart_state = UART_FIFO_READ_FLUSH;
@@ -224,21 +229,21 @@ static void interrupt_handler(struct device *dev) {
 			data = NULL;
 			tail = 0;
 		}
-
-		uart_state = UART_FIFO_READ_END;
 	}
 }
 
-static void write_data(const char *buf, int len) {
+/*************************** ACM OUTPUT *******************************/
+
+void acm_write(const char *buf, int len) {
 	struct device *dev = dev_upload;
 	uart_irq_tx_enable(dev);
 	data_transmitted = false;
 	uart_fifo_fill(dev, buf, len);
 }
 
-void print_acm(const char *buf) {
-	write_data(buf, strlen(buf));
-	write_data("\r\n", 3);
+void acm_println(const char *buf) {
+	acm_write(buf, strlen(buf));
+	acm_write("\r\n", 3);
 }
 
 /**************************** DEVICE **********************************/
@@ -270,10 +275,13 @@ void uart_uploader_runner(int arg1, int arg2) {
 	char *buf = NULL;
 	uint32_t len = 0;
 
+	DBG("[Listening]\n");
 	while (1) {
 		uart_state = UART_INIT;
-		if (uploader_config.interface.init_cb != NULL)
+		if (uploader_config.interface.init_cb != NULL) {
+			DBG("[Init]\n");
 			uploader_config.interface.init_cb(uploader_config.filename);
+		}
 
 		while (!uploader_config.interface.is_done()) {
 			uart_state = UART_WAITING;
@@ -361,7 +369,7 @@ void acm() {
 	uart_irq_tx_disable(dev_upload);
 
 	uart_irq_callback_set(dev_upload, interrupt_handler);
-	write_data(banner, strlen(banner));
+	acm_write(banner, strlen(banner));
 
 	/* Enable rx interrupts */
 	uart_irq_rx_enable(dev_upload);
