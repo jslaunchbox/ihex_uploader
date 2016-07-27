@@ -24,11 +24,19 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <atomic.h>
 #include <malloc.h>
 #include <misc/printk.h>
+#include <ctype.h>
+
 #include "uart-uploader.h"
 
-#define CONFIG_SHELL_UPLOADER_DEBUG
+const char acm_prompt[] = ANSI_FG_BLUE "acm> " ANSI_FG_RESTORE;
+const char *acm_get_prompt() {
+	return acm_prompt;
+}
+
+//#define CONFIG_SHELL_UPLOADER_DEBUG
 
 #ifndef CONFIG_SHELL_UPLOADER_DEBUG
 #define DBG(...) { ; }
@@ -44,6 +52,161 @@
 #define MAX_ARGUMENT_SIZE 32
 static char *shell_line;
 static uint8_t tail;
+
+/* Control characters */
+#define ESC                0x1b
+#define DEL                0x7f
+
+/* ANSI escape sequences */
+#define ANSI_ESC           '['
+#define ANSI_UP            'A'
+#define ANSI_DOWN          'B'
+#define ANSI_FORWARD       'C'
+#define ANSI_BACKWARD      'D'
+
+static inline void cursor_forward(unsigned int count) {
+	for(int t=0; t<count; t++)
+		acm_print("\x1b[1C");
+}
+
+static inline void cursor_backward(unsigned int count) {
+	for (int t = 0; t<count; t++)
+		acm_print("\x1b[1D");
+}
+
+static inline void cursor_save(void) {
+	acm_print("\x1b[s");
+}
+
+static inline void cursor_restore(void) {
+	acm_print("\x1b[u");
+}
+
+static void insert_char(char *pos, char c, uint8_t end) {
+	char tmp;
+
+	/* Echo back to console */
+	acm_writec(c);
+
+	if (end == 0) {
+		*pos = c;
+		return;
+	}
+
+	tmp = *pos;
+	*(pos++) = c;
+
+	cursor_save();
+
+	while (end-- > 0) {
+		acm_writec(tmp);
+		c = *pos;
+		*(pos++) = tmp;
+		tmp = c;
+	}
+
+	/* Move cursor back to right place */
+	cursor_restore();
+}
+
+
+static void del_char(char *pos, uint8_t end) {
+	acm_writec('\b');
+
+	if (end == 0) {
+		acm_writec(' ');
+		acm_writec('\b');
+		return;
+	}
+
+	cursor_save();
+
+	while (end-- > 0) {
+		*pos = *(pos + 1);
+		acm_writec(*(pos++));
+	}
+
+	acm_writec(' ');
+
+	/* Move cursor back to right place */
+	cursor_restore();
+}
+
+enum {
+	ESC_ESC,
+	ESC_ANSI,
+	ESC_ANSI_FIRST,
+	ESC_ANSI_VAL,
+	ESC_ANSI_VAL_2
+};
+
+static atomic_t esc_state;
+static unsigned int ansi_val, ansi_val_2;
+static uint8_t cur, end;
+
+static void handle_ansi(uint8_t byte) {
+	if (atomic_test_and_clear_bit(&esc_state, ESC_ANSI_FIRST)) {
+		if (!isdigit(byte)) {
+			ansi_val = 1;
+			goto ansi_cmd;
+		}
+
+		atomic_set_bit(&esc_state, ESC_ANSI_VAL);
+		ansi_val = byte - '0';
+		ansi_val_2 = 0;
+		return;
+	}
+
+	if (atomic_test_bit(&esc_state, ESC_ANSI_VAL)) {
+		if (isdigit(byte)) {
+			if (atomic_test_bit(&esc_state, ESC_ANSI_VAL_2)) {
+				ansi_val_2 *= 10;
+				ansi_val_2 += byte - '0';
+			}
+			else {
+				ansi_val *= 10;
+				ansi_val += byte - '0';
+			}
+			return;
+		}
+
+		/* Multi value sequence, e.g. Esc[Line;ColumnH */
+		if (byte == ';' &&
+			!atomic_test_and_set_bit(&esc_state, ESC_ANSI_VAL_2)) {
+			return;
+		}
+
+		atomic_clear_bit(&esc_state, ESC_ANSI_VAL);
+		atomic_clear_bit(&esc_state, ESC_ANSI_VAL_2);
+	}
+
+ansi_cmd:
+	switch (byte) {
+		case ANSI_BACKWARD:
+			if (ansi_val > cur) {
+				break;
+			}
+
+			end += ansi_val;
+			cur -= ansi_val;
+			cursor_backward(ansi_val);
+			break;
+		case ANSI_FORWARD:
+			if (ansi_val > end) {
+				break;
+			}
+
+			end -= ansi_val;
+			cur += ansi_val;
+			cursor_forward(ansi_val);
+			break;
+		default:
+			break;
+	}
+
+	atomic_clear_bit(&esc_state, ESC_ANSI);
+}
+
 
 /*
 * Returns the number of arguments on the string
@@ -79,6 +242,7 @@ uint32_t shell_get_argc(const char *str, uint32_t nsize) {
 	return size;
 }
 
+
 /* Copies the next argument into the string
 * str     Null terminated string
 * nsize   Checks line size boundaries.
@@ -109,83 +273,122 @@ const char *shell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, u
 	return str;
 }
 
+
 uint32_t shell_process_init(const char *filename) {
 	printf("[SHELL] Init\n");
 	shell_line = NULL;
 	return 0;
 }
 
+
 void shell_process_line(const char *buf, uint32_t len) {
 	char arg[MAX_ARGUMENT_SIZE];
 	uint32_t argc, arg_len;
 
-	printf("** Line found **\n");
-	printf("%s", buf);
-
+	printk("[BOF]");
 	argc = shell_get_argc(buf, len);
+
+	printk("%s", argc, buf);
+	printk("[EOF]\n");
+
+	printk("[ARGS %u]\n", argc);
 	for (int t = 0; t < argc; t++) {
 		buf = shell_get_next_arg(buf, len, arg, &arg_len);
-		printf("[%s]::%d \n", buf, (int) len);
 		printf(" Arg [%s]::%d \n", arg, (int) arg_len);
 	}
+
+	printk(system_get_prompt());
+	acm_print(acm_get_prompt());
 }
+
 
 uint32_t shell_process_data(const char *buf, uint32_t len) {
 	uint32_t processed = 0;
-	bool eof = false;
 	bool flush_line = false;
 
 	if (shell_line == NULL) {
-		printk("[Proccess]%d\n", (int)len);
-		printk("[%s]\n", buf);
+		DBG("[Proccess]%d\n", (int)len);
+		DBG("[%s]\n", buf);
 		shell_line = (char *)malloc(MAX_LINE);
 		tail = 0;
 	}
 
 	while (len-- > 0) {
 		processed++;
-		char byte = *buf++;
+		uint8_t byte = *buf++;
 
 		if (tail == MAX_LINE) {
 			DBG("Line size exceeded \n");
 			tail = 0;
 		}
 
-		if (eof && byte != '\n') {
-			flush_line = true;
-		} else {
-			shell_line[tail] = byte;
+		DBG("(%x)", byte);
+
+		/* Handle ANSI escape mode */
+		if (atomic_test_bit(&esc_state, ESC_ANSI)) {
+			handle_ansi(byte);
+			continue;
 		}
 
-		acm_write(&byte, 1);
+		/* Handle escape mode */
+		if (atomic_test_and_clear_bit(&esc_state, ESC_ESC)) {
+			switch (byte) {
+				case ANSI_ESC:
+					atomic_set_bit(&esc_state, ESC_ANSI);
+					atomic_set_bit(&esc_state, ESC_ANSI_FIRST);
+					break;
+				default:
+					break;
+			}
 
-		switch (byte) {
-			case '\r':
-				DBG("<CR>");
-				eof = true;
-				break;
-			case '\n':
-				DBG("<IF>");
-				flush_line = true;
-				break;
+			continue;
+		}
+
+		/* Handle special control characters */
+		if (!isprint(byte)) {
+			switch (byte) {
+				case DEL:
+					if (cur > 0) {
+						del_char(&shell_line[--cur], end);
+					}
+					break;
+				case ESC:
+					atomic_set_bit(&esc_state, ESC_ESC);
+					break;
+				case '\r':
+					DBG("<CR>\n");
+					flush_line = true;
+					break;
+				case '\t':
+					acm_writec('\t');
+					break;
+				case '\n':
+					DBG("<IF>");
+					break;
+				default:
+					break;
+			}
 		}
 
 		if (flush_line) {
-			shell_process_line(shell_line, tail);
+			DBG("Line %u %u \n", cur, end);
+			shell_line[cur + end] = '\0';
+			acm_write("\r\n", 3);
+
+			shell_process_line(shell_line, strlen(shell_line));
+			cur = end = 0;
 			flush_line = false;
-			tail = 0;
-
-			// Detected <CR> without <IF>
-			if (eof)
-				shell_line[0] = byte;
-
-			eof = false;
+		} else
+		/* Ignore characters if there's no more buffer space */
+		if (isprint(byte) && cur + end < MAX_LINE - 1) {
+			insert_char(&shell_line[cur++], byte, end);
 		}
+
 	}
 
 	// Done processing line
-	if (tail == 0 && shell_line != NULL) {
-		printk("[Free]\n");
+	if (cur == 0 && end == 0 && shell_line != NULL) {
+		DBG("[Free]\n");
 		free(shell_line);
 		shell_line = NULL;
 	}
@@ -279,7 +482,7 @@ void shell_unit_test() {
 			}
 			printf(" %d [%s]\n", test[t].result - argc, arg);
 			argc--;
-}
+		}
 		t++;
 	}
 

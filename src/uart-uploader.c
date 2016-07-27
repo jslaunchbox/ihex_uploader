@@ -67,6 +67,13 @@
 const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
 const char filename[] = "jerry.js";
 
+// Jerryscript in green color
+
+const char system_prompt[] = ANSI_FG_GREEN "js> " ANSI_FG_RESTORE;
+const char *system_get_prompt() {
+	return system_prompt;
+}
+
 #define MAX_LINE_LEN 16
 #define FIFO_CACHE 2
 
@@ -260,6 +267,7 @@ static void interrupt_handler(struct device *dev) {
  * really dislike this wait here from the example
  * will probably rewrite it later with a line queue
  */
+
 void acm_write(const char *buf, int len) {
 	struct device *dev = dev_upload;
 	uart_irq_tx_enable(dev);
@@ -269,6 +277,14 @@ void acm_write(const char *buf, int len) {
 	while (data_transmitted == false)
 		;
 	uart_irq_tx_disable(dev);
+}
+
+void acm_writec(char byte) {
+	acm_write(&byte, 1);
+}
+
+void acm_print(const char *buf) {
+	acm_write(buf, strlen(buf));
 }
 
 void acm_println(const char *buf) {

@@ -17,6 +17,22 @@
 #define __UART_UPLOADER_H__
 
  /**
+ * Ansi helpers
+ * https://telepathy.freedesktop.org/doc/telepathy-glib/telepathy-glib-debug-ansi.html
+ */
+
+#define ANSI_FG_BLUE    "\x1b[34m"
+#define ANSI_FG_YELLOW  "\x1b[33m"
+#define ANSI_FG_GREEN   "\x1b[32m"
+#define ANSI_FG_RED     "\x1b[31m"
+#define ANSI_FG_RESTORE "\x1b[39m"
+
+/**
+ * Returns the command prompt of this system
+ */
+const char *system_get_prompt();
+
+ /**
  * Callback function initialize the process
  */
 typedef uint32_t(*process_init_callback)(const char *filename);
@@ -101,5 +117,7 @@ void uart_clear();
 
 void acm_println(const char *buf);
 void acm_write(const char *buf, int len);
+void acm_writec(char byte);
+void acm_print(const char *buf);
 
 #endif

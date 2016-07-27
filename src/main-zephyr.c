@@ -205,7 +205,7 @@ void main(void)
 	shell_clear_command(0, 0);
 	printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
 	shell_register_app_cmd_handler(shell_cmd_handler);
-	shell_init("\x1b[32mjs>\x1b[39m ", commands);
+	shell_init(system_get_prompt(), commands);
 	/* Don't call jerry_cleanup() here, as shell_init() returns after setting
 	   up background task to process shell input, and that task calls
 	   shell_cmd_handler(), etc. as callbacks. This processing happens in
