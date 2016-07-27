@@ -16,5 +16,6 @@
 #ifndef __ACM_SHELL__H_
 #define __ACM_SHELL__H_
 
+void shell_process_start();
 
 #endif

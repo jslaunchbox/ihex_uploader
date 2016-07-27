@@ -64,9 +64,6 @@
 #endif /* CONFIG_STDOUT_CONSOLE */
 #endif /* CONFIG_IHEX_UPLOADER_DEBUG */
 
-#undef DBG
-#define DBG printk
-
 const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
 const char filename[] = "jerry.js";
 
@@ -95,6 +92,7 @@ struct uart_uploader_input {
 
 static struct nano_fifo avail_queue;
 static struct nano_fifo data_queue;
+static bool uart_process_done = false;
 static uint8_t fifo_size = 0;
 static uint8_t max_fifo_size = 0;
 
@@ -194,25 +192,48 @@ static void interrupt_handler(struct device *dev) {
 	while (uart_irq_rx_ready(dev)) {
 		uart_state = UART_RX_READY;
 
+		/* We allocate a new buffer everytime we don't have a tail
+		 * the buffer might be recycled or not from a previous run.
+		 */
 		if (tail == 0) {
 			DBG("[New]\n");
 			data = fifo_get_isr_buffer();
 			buf = data->line;
 		}
 
+		/* Read only until the end of the buffer
+		 * before i was using a ring buffer but was making things really
+		 * complicated for process side.
+		 */
 		len = MAX_LINE_LEN - tail;
 		bytes_read = uart_fifo_read(dev_upload, buf, len);
 		bytes_received += bytes_read;
 		tail += bytes_read;
 
 		data->line[tail] = 0;
-		//printf("[%s]\r\n", data->line);
+		//DGB("[%s]\r\n", data->line);
 
+		/* We don't want to flush data too fast otherwise we would be allocating
+		 * but we want to flush as soon as we have processed the data on the task
+		 * so we don't queue too much and delay the system response.
+		 *
+		 * When the process has finished dealing with the data it signals this method
+		 * with a 'i am ready to continue' by changing uart_process_done.
+		 *
+		 * It is also imperative to flush when we reach the limit of the buffer.
+		 */
 		bool flush = false;
-		if (tail == MAX_LINE_LEN || (!uart_irq_rx_ready(dev) && bytes_read > 4)) {
+
+		if (uart_process_done ||
+			tail == MAX_LINE_LEN ||
+			(!uart_irq_rx_ready(dev) && bytes_read > 4)) {
 			flush = true;
+			uart_process_done = false;
 		}
 
+		/* Check for line ends, to flush the data. The decoder / shell will probably
+		 * sit for a bit in the data so it is better if we finish this buffer and send it.
+		 */
 		uart_state = UART_FIFO_READ;
 		while (bytes_read-- > 0) {
 			byte = *buf++;
@@ -222,6 +243,7 @@ static void interrupt_handler(struct device *dev) {
 
 		uart_state = UART_FIFO_READ_END;
 
+		/* Happy to flush the data into the queue for processing */
 		if (flush) {
 			data->line[tail] = 0;
 			uart_state = UART_FIFO_READ_FLUSH;
@@ -233,12 +255,20 @@ static void interrupt_handler(struct device *dev) {
 }
 
 /*************************** ACM OUTPUT *******************************/
-
+/*
+ * Write into the data buffer,
+ * really dislike this wait here from the example
+ * will probably rewrite it later with a line queue
+ */
 void acm_write(const char *buf, int len) {
 	struct device *dev = dev_upload;
 	uart_irq_tx_enable(dev);
+
 	data_transmitted = false;
 	uart_fifo_fill(dev, buf, len);
+	while (data_transmitted == false)
+		;
+	uart_irq_tx_disable(dev);
 }
 
 void acm_println(const char *buf) {
@@ -294,13 +324,10 @@ void uart_uploader_runner(int arg1, int arg2) {
 
 				DBG("[Data]\n");
 				DBG("%s\n", buf);
-
-				// Finished transmiting, disable tx irq
-				if (data_transmitted == true)
-					uart_irq_tx_disable(dev_upload);
 			}
 
 			bytes_processed += uploader_config.interface.process_cb(buf, len);
+			uart_process_done = true;
 
 			DBG("[Recycle]\n");
 			fifo_recycle_buffer(data);

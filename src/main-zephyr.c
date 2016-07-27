@@ -24,6 +24,7 @@
 
 #include "uart-uploader.h"
 #include "ihex-handler.h"
+#include "acm-shell.h"
 
 #define CONFIG_USE_JS_SHELL
 #define CONFIG_USE_IHEX_UPLOADER
@@ -211,6 +212,10 @@ void main(void)
 	   the infinite loop, so JerryScript doesn't need to be de-initialized. */
 #endif
 
+#ifdef CONFIG_USE_IHEX_LOADER_ONLY
 	ihex_process_start();
+#else
+	shell_process_start();
+#endif
 } /* main */
 

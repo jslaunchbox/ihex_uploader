@@ -48,8 +48,6 @@
 #include "uart-uploader.h"
 #include "ihex/kk_ihex_read.h"
 
-#define CONFIG_IHEX_UPLOADER_DEBUG
-
 #ifndef CONFIG_IHEX_UPLOADER_DEBUG
 #define DBG(...) { ; }
 #else

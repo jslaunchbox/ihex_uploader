@@ -93,6 +93,7 @@ struct uploader_cfg_data {
 };
 
 void process_set_config(struct uploader_cfg_data *config);
+
 uint32_t uart_get_baudrate(void);
 uint8_t uart_get_last_state();
 void uart_print_status();
