@@ -31,7 +31,7 @@
 
 #include "uart-uploader.h"
 
-const char acm_prompt[] = ANSI_FG_BLUE "acm> " ANSI_FG_RESTORE;
+const char acm_prompt[] = ANSI_FG_YELLOW "acm> " ANSI_FG_RESTORE;
 const char *acm_get_prompt() {
 	return acm_prompt;
 }
