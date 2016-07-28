@@ -69,18 +69,22 @@ static inline void cursor_forward(unsigned int count) {
 		acm_print("\x1b[1C");
 }
 
+
 static inline void cursor_backward(unsigned int count) {
 	for (int t = 0; t<count; t++)
 		acm_print("\x1b[1D");
 }
 
+
 static inline void cursor_save(void) {
 	acm_print("\x1b[s");
 }
 
+
 static inline void cursor_restore(void) {
 	acm_print("\x1b[u");
 }
+
 
 static void insert_char(char *pos, char c, uint8_t end) {
 	char tmp;
@@ -208,11 +212,13 @@ ansi_cmd:
 }
 
 
-/*
-* Returns the number of arguments on the string
-* str   Null terminated string
-* nsize Check for size boundaries
-*/
+/** @brief Get the number of arguments in a string
+ *
+ * @param str   Null terminated string
+ * @param nsize Check for size boundaries
+ * @return Returns the number of arguments on the string
+ */
+
 uint32_t shell_get_argc(const char *str, uint32_t nsize) {
 	if (str == NULL || nsize == 0 || *str == '\0')
 		return 0;
@@ -243,12 +249,14 @@ uint32_t shell_get_argc(const char *str, uint32_t nsize) {
 }
 
 
-/* Copies the next argument into the string
-* str     Null terminated string
-* nsize   Checks line size boundaries.
-* str_arg Initialized destination for the argument
-* length  Returns length of the argument found.
-*/
+/** @brief Copy the next argument into the string
+ *
+ * @param str     Null terminated string
+ * @param nsize   Checks line size boundaries.
+ * @param str_arg Initialized destination for the argument
+ * @param length  Returns length of the argument found.
+ * @return 0 Pointer to where this argument finishes
+ */
 
 const char *shell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, uint32_t *length) {
 	*length = 0;
@@ -395,13 +403,16 @@ uint32_t shell_process_data(const char *buf, uint32_t len) {
 	return processed;
 }
 
+
 bool shell_process_is_done() {
 	return false;
 }
 
+
 uint32_t shell_process_finish() {
 	return 0;
 }
+
 
 void shell_print_status() {
 	printf("Shell Status\n");
@@ -412,6 +423,7 @@ void shell_print_status() {
 		printf("No data\n");
 	}
 }
+
 
 void shell_process_start() {
 	struct uploader_cfg_data cfg;
@@ -426,6 +438,7 @@ void shell_process_start() {
 
 	process_set_config(&cfg);
 }
+
 
 #ifdef CONFIG_SHELL_UNIT_TESTS
 struct shell_tests {
@@ -450,6 +463,7 @@ const struct shell_tests test[] =
 	TEST_PARAMS(" ", 0, 0), // Wrong string length
 	TEST_PARAMS(NULL, 0, 0)
 };
+
 
 void shell_unit_test() {
 	uint32_t t = 0;

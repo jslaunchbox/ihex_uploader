@@ -15,11 +15,11 @@
 */
 
 /**
-* @file
-* @brief Simulates the disk access to create a writtable memory section
-* to help on the transactions between the UART and the Javascript code
-* this is a basic stub, do not expect a full implementation.
-*/
+ * @file
+ * @brief Simulates the disk access to create a writtable memory section
+ * to help on the transactions between the UART and the Javascript code
+ * this is a basic stub, do not expect a full implementation.
+ */
 
 #include <nanokernel.h>
 #include <arch/cpu.h>
@@ -102,7 +102,7 @@ int csclose(CODE * stream) {
 	return (EOF);
 }
 
-#ifdef TESTING
+#ifdef CONFIG_CODE_MEMORY_TESTING
 void main() {
 	CODE *myfile;
 

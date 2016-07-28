@@ -47,7 +47,7 @@ int jerryscript_test()
 		false);
 
 	return jerry_value_has_error_flag(ret_val) ? -1 : 0;
-} /* jerryscript_test */
+}
 
 #ifdef CONFIG_USE_JS_SHELL
 #define VERBOSE 0x01
@@ -60,15 +60,13 @@ static int shell_cmd_verbose(int argc, char *argv[])
 	printf("Enable verbose \n");
 	flags |= VERBOSE;
 	return 0;
-} /* shell_cmd_verbose */
-
+}
 
 static int shell_cmd_syntax_help(int argc, char *argv[])
 {
 	printf("version jerryscript & zephyr versions\n");
 	return 0;
-} /* shell_cmd_syntax_help */
-
+} 
 
 static int shell_cmd_version(int argc, char *argv[])
 {
@@ -76,11 +74,11 @@ static int shell_cmd_version(int argc, char *argv[])
 
 	printf("Jerryscript API %d.%d\n", JERRY_API_MAJOR_VERSION, JERRY_API_MINOR_VERSION);
 
-	printf("Zephyr version %d.%d.%d\n", (int) SYS_KERNEL_VER_MAJOR(version),
-		(int) SYS_KERNEL_VER_MINOR(version),
-		(int) SYS_KERNEL_VER_PATCHLEVEL(version));
+	printf("Zephyr version %d.%d.%d\n", (int)SYS_KERNEL_VER_MAJOR(version),
+		(int)SYS_KERNEL_VER_MINOR(version),
+		(int)SYS_KERNEL_VER_PATCHLEVEL(version));
 	return 0;
-} /* shell_cmd_version */
+} 
 
 static int shell_acm_command(int argc, char *argv[])
 {
@@ -89,7 +87,7 @@ static int shell_acm_command(int argc, char *argv[])
 
 	char *cmd = argv[1];
 
-	printf("[ACM] %s\n",cmd);
+	printf("[ACM] %s\n", cmd);
 
 	if (!strcmp(cmd, "get_baudrate")) {
 		uart_get_baudrate();
@@ -103,8 +101,8 @@ static int shell_acm_command(int argc, char *argv[])
 
 	if (!strcmp(cmd, "print")) {
 		for (int t = 2; t < argc; t++) {
-			if (t>2)
-				acm_write(" ",2);
+			if (t > 2)
+				acm_write(" ", 2);
 			acm_write(argv[t], strlen(argv[t]));
 		}
 		acm_write("\r\n", 3);
@@ -217,5 +215,5 @@ void main(void)
 #else
 	shell_process_start();
 #endif
-} /* main */
+}
 
