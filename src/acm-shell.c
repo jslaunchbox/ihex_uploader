@@ -294,21 +294,22 @@ uint32_t ashell_process_init(const char *filename) {
 
 
 void ashell_process_line(const char *buf, uint32_t len) {
+#ifdef CONFIG_SHELL_UPLOADER_DEBUG
 	char arg[MAX_ARGUMENT_SIZE];
 	uint32_t argc, arg_len;
 
 	printk("[BOF]");
-	argc = ashell_get_argc(buf, len);
-
-	printk("%s", argc, buf);
+	printk("%s", buf);
 	printk("[EOF]\n");
+	argc = ashell_get_argc(buf, len);
 
 	printk("[ARGS %u]\n", argc);
 	for (int t = 0; t < argc; t++) {
 		buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+		len -= arg_len;
 		printf(" Arg [%s]::%d \n", arg, (int) arg_len);
 	}
-
+#endif
 	printk(system_get_prompt());
 	acm_print(acm_get_prompt());
 }
@@ -387,10 +388,11 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 			shell_line[cur + end] = '\0';
 			acm_write("\r\n", 3);
 
+			uint32_t length = strlen(shell_line);
 			if (app_line_cb != NULL)
-				app_line_cb(buf, strlen(shell_line));
+				app_line_cb(shell_line, length);
 
-			ashell_process_line(shell_line, strlen(shell_line));
+			ashell_process_line(shell_line, length);
 			cur = end = 0;
 			flush_line = false;
 		} else

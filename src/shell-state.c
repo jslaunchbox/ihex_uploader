@@ -31,6 +31,60 @@
 
 #include "acm-shell.h"
 
-void ashell_main_state(const char *buf, uint32_t len) {
+#define CMD_SET "set"
+#define CMD_TEST "test"
+#define CMD_BLUETOOTH "bl"
 
+#define MAX_ARGUMENT_SIZE 32
+
+void ashell_set_state(const char *buf, uint32_t argc, uint32_t len) {
+	char arg[MAX_ARGUMENT_SIZE];
+	uint32_t arg_len = 0;
+
+	for (int t = 0; t < argc; t++) {
+		buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+		len -= arg_len;
+		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
+	}
+}
+
+void ashell_main_state(const char *buf, uint32_t len) {
+	char arg[MAX_ARGUMENT_SIZE];
+	uint32_t argc, arg_len = 0;
+
+	printk("[ASHELL]");
+
+	argc = ashell_get_argc(buf, len);
+	printk("[ARGS %u]\n", argc);
+
+	if (argc == 0)
+		return;
+
+	printk("[BOF]");
+	printk("%s", buf);
+	printk("[EOF]\n");
+
+	buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+	len -= arg_len;
+	argc--;
+
+	if (!strcmp(CMD_TEST, arg)) {
+		acm_println("Hi world");
+		return;
+	}
+
+	if (!strcmp(CMD_SET, arg)) {
+		ashell_set_state(buf, argc, len);
+		return;
+	}
+
+#ifdef CONFIG_SHELL_UPLOADER_DEBUG
+	printk("%u [%s] \n", arg_len, arg);
+
+	for (int t = 0; t < argc; t++) {
+		buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+		len -= arg_len;
+		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
+}
+#endif
 }
