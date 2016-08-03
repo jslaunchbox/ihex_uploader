@@ -35,18 +35,32 @@
 #define CMD_SET "set"
 #define CMD_TEST "test"
 #define CMD_CLEAR "clear"
+#define CMD_TRANSFER "transfer"
 #define CMD_BLUETOOTH "bl"
+
+const char ERROR_NOT_ENOUGH_ARGUMENTS[] = "Not enough arguments";
 
 #define MAX_ARGUMENT_SIZE 32
 
-void ashell_set_state(const char *buf, uint32_t argc, uint32_t len) {
-	char arg[MAX_ARGUMENT_SIZE];
-	uint32_t arg_len = 0;
+void ashell_set_transfer_state(const char *buf, uint32_t len, char *arg) {
+	uint32_t arg_len;
 
-	for (int t = 0; t < argc; t++) {
-		buf = ashell_get_next_arg(buf, len, arg, &arg_len);
-		len -= arg_len;
-		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
+	buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+	len -= arg_len;
+	printf(" Arg [%s]::%d \n", arg, (int)arg_len);
+}
+
+void ashell_set_state(const char *buf, uint32_t len, char *arg) {
+	uint32_t arg_len;
+	buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+	if (arg_len == 0) {
+		printf(ERROR_NOT_ENOUGH_ARGUMENTS);
+		return;
+	}
+	len -= arg_len;
+
+	if (!strcmp(CMD_TRANSFER, arg)) {
+		ashell_set_transfer_state(buf, len, arg);
 	}
 }
 
@@ -76,7 +90,7 @@ void ashell_main_state(const char *buf, uint32_t len) {
 	}
 
 	if (!strcmp(CMD_SET, arg)) {
-		ashell_set_state(buf, argc, len);
+		ashell_set_state(buf, len, arg);
 		return;
 	}
 
