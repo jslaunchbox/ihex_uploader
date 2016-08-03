@@ -359,6 +359,7 @@ void uart_uploader_runner(int arg1, int arg2) {
 	uart_state = UART_TERMINATED;
 }
 
+#ifdef CONFIG_UART_LINE_CTRL
 uint32_t uart_get_baudrate(void) {
 	uint32_t baudrate;
 
@@ -370,12 +371,10 @@ uint32_t uart_get_baudrate(void) {
 
 	return baudrate;
 }
+#endif
 
 /* ACM TASK */
 void acm() {
-	uint32_t dtr = 0;
-	int ret;
-
 	dev_upload = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
 
 	if (!dev_upload) {
@@ -385,6 +384,10 @@ void acm() {
 
 	nano_fifo_init(&data_queue);
 	nano_fifo_init(&avail_queue);
+
+#ifdef CONFIG_UART_LINE_CTRL
+	uint32_t dtr = 0;
+	int ret;
 
 	printf("Wait for DTR\n");
 	while (1) {
@@ -407,6 +410,7 @@ void acm() {
 	sys_thread_busy_wait(1000000);
 
 	uart_get_baudrate();
+#endif
 
 	uart_irq_rx_disable(dev_upload);
 	uart_irq_tx_disable(dev_upload);

@@ -30,6 +30,8 @@
 #include <ctype.h>
 
 #include "uart-uploader.h"
+#include "acm-shell.h"
+#include "shell-state.h"
 
 const char acm_prompt[] = ANSI_FG_YELLOW "acm> " ANSI_FG_RESTORE;
 const char *acm_get_prompt() {
@@ -50,8 +52,10 @@ const char *acm_get_prompt() {
 
 #define MAX_LINE 128
 #define MAX_ARGUMENT_SIZE 32
-static char *shell_line;
-static uint8_t tail;
+
+static ashell_line_parser_t app_line_cb = NULL;
+static char *shell_line = NULL;
+static uint8_t tail = 0;
 
 /* Control characters */
 #define ESC                0x1b
@@ -219,7 +223,7 @@ ansi_cmd:
  * @return Returns the number of arguments on the string
  */
 
-uint32_t shell_get_argc(const char *str, uint32_t nsize) {
+uint32_t ashell_get_argc(const char *str, uint32_t nsize) {
 	if (str == NULL || nsize == 0 || *str == '\0')
 		return 0;
 
@@ -258,7 +262,7 @@ uint32_t shell_get_argc(const char *str, uint32_t nsize) {
  * @return 0 Pointer to where this argument finishes
  */
 
-const char *shell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, uint32_t *length) {
+const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, uint32_t *length) {
 	*length = 0;
 	if (nsize == 0 || str == NULL || *str == '\0') {
 		str_arg[0] = '\0';
@@ -282,26 +286,26 @@ const char *shell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, u
 }
 
 
-uint32_t shell_process_init(const char *filename) {
+uint32_t ashell_process_init(const char *filename) {
 	printf("[SHELL] Init\n");
 	shell_line = NULL;
 	return 0;
 }
 
 
-void shell_process_line(const char *buf, uint32_t len) {
+void ashell_process_line(const char *buf, uint32_t len) {
 	char arg[MAX_ARGUMENT_SIZE];
 	uint32_t argc, arg_len;
 
 	printk("[BOF]");
-	argc = shell_get_argc(buf, len);
+	argc = ashell_get_argc(buf, len);
 
 	printk("%s", argc, buf);
 	printk("[EOF]\n");
 
 	printk("[ARGS %u]\n", argc);
 	for (int t = 0; t < argc; t++) {
-		buf = shell_get_next_arg(buf, len, arg, &arg_len);
+		buf = ashell_get_next_arg(buf, len, arg, &arg_len);
 		printf(" Arg [%s]::%d \n", arg, (int) arg_len);
 	}
 
@@ -310,7 +314,7 @@ void shell_process_line(const char *buf, uint32_t len) {
 }
 
 
-uint32_t shell_process_data(const char *buf, uint32_t len) {
+uint32_t ashell_process_data(const char *buf, uint32_t len) {
 	uint32_t processed = 0;
 	bool flush_line = false;
 
@@ -383,7 +387,10 @@ uint32_t shell_process_data(const char *buf, uint32_t len) {
 			shell_line[cur + end] = '\0';
 			acm_write("\r\n", 3);
 
-			shell_process_line(shell_line, strlen(shell_line));
+			if (app_line_cb != NULL)
+				app_line_cb(buf, strlen(shell_line));
+
+			ashell_process_line(shell_line, strlen(shell_line));
 			cur = end = 0;
 			flush_line = false;
 		} else
@@ -404,17 +411,17 @@ uint32_t shell_process_data(const char *buf, uint32_t len) {
 }
 
 
-bool shell_process_is_done() {
+bool ashell_process_is_done() {
 	return false;
 }
 
 
-uint32_t shell_process_finish() {
+uint32_t ashell_process_finish() {
 	return 0;
 }
 
 
-void shell_print_status() {
+void ashell_print_status() {
 	printf("Shell Status\n");
 	printf("Tail %d\n", tail);
 	if (shell_line != NULL) {
@@ -424,19 +431,24 @@ void shell_print_status() {
 	}
 }
 
+void ashell_register_app_line_handler(ashell_line_parser_t cb) {
+	app_line_cb = cb;
+}
 
-void shell_process_start() {
+void ashell_process_start() {
 	struct uploader_cfg_data cfg;
 
 	cfg.cb_status = NULL;
-	cfg.interface.init_cb = shell_process_init;
+	cfg.interface.init_cb = ashell_process_init;
 	cfg.interface.error_cb = NULL;
-	cfg.interface.is_done = shell_process_is_done;
-	cfg.interface.close_cb = shell_process_finish;
-	cfg.interface.process_cb = shell_process_data;
-	cfg.print_state = shell_print_status;
+	cfg.interface.is_done = ashell_process_is_done;
+	cfg.interface.close_cb = ashell_process_finish;
+	cfg.interface.process_cb = ashell_process_data;
+	cfg.print_state = ashell_print_status;
 
 	process_set_config(&cfg);
+
+	ashell_register_app_line_handler(ashell_main_state);
 }
 
 
@@ -470,7 +482,7 @@ void shell_unit_test() {
 	uint32_t argc;
 
 	while (t != sizeof(test) / sizeof(shell_tests)) {
-		argc = shell_get_argc(test[t].str, test[t].size);
+		argc = ashell_get_argc(test[t].str, test[t].size);
 		if (argc != test[t].result) {
 			printf("Failed [%s] %d!=%d ",
 				test[t].str,
@@ -487,10 +499,10 @@ void shell_unit_test() {
 
 	while (t != sizeof(test) / sizeof(shell_tests)) {
 		const char *line = test[t].str;
-		argc = shell_get_argc(line, test[t].size);
+		argc = ashell_get_argc(line, test[t].size);
 		printf("Test [%s] %d\n", line, argc);
 		while (argc > 0) {
-			line = shell_get_next_arg(line, strlen(line), arg, &len);
+			line = ashell_get_next_arg(line, strlen(line), arg, &len);
 			if (len != strlen(arg)) {
 				printf("Failed [%s] %d!=%d ", arg, len, strlen(arg));
 			}

@@ -66,7 +66,7 @@ static int shell_cmd_syntax_help(int argc, char *argv[])
 {
 	printf("version jerryscript & zephyr versions\n");
 	return 0;
-} 
+}
 
 static int shell_cmd_version(int argc, char *argv[])
 {
@@ -78,7 +78,7 @@ static int shell_cmd_version(int argc, char *argv[])
 		(int)SYS_KERNEL_VER_MINOR(version),
 		(int)SYS_KERNEL_VER_PATCHLEVEL(version));
 	return 0;
-} 
+}
 
 static int shell_acm_command(int argc, char *argv[])
 {
@@ -89,10 +89,12 @@ static int shell_acm_command(int argc, char *argv[])
 
 	printf("[ACM] %s\n", cmd);
 
+#ifdef CONFIG_UART_LINE_CTRL
 	if (!strcmp(cmd, "get_baudrate")) {
 		uart_get_baudrate();
 		return 0;
 	}
+#endif
 
 	if (!strcmp(cmd, "clear")) {
 		uart_clear();
@@ -213,7 +215,7 @@ void main(void)
 #ifdef CONFIG_USE_IHEX_LOADER_ONLY
 	ihex_process_start();
 #else
-	shell_process_start();
+	ashell_process_start();
 #endif
 }
 

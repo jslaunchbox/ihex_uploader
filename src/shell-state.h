@@ -13,23 +13,9 @@
  * limitations under the License.
  */
 
-#ifndef __ACM_SHELL__H_
-#define __ACM_SHELL__H_
+#ifndef __SHELL__STATE__H__
+#define __SHELL__STATE__H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
- /**
- * Callback function when a line arrives
- */
-typedef void(*ashell_line_parser_t)(const char *buf, uint32_t len);
-
-void ashell_process_start();
-void ashell_register_app_line_handler(ashell_line_parser_t cb);
-
-#ifdef __cplusplus
-}
-#endif
+void ashell_main_state(const char *buf, uint32_t len);
 
 #endif
