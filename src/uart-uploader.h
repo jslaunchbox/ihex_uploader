@@ -26,6 +26,7 @@
 #define ANSI_FG_GREEN   "\x1b[32m"
 #define ANSI_FG_RED     "\x1b[31m"
 #define ANSI_FG_RESTORE "\x1b[39m"
+#define ANSI_CLEAR      "\x1b[2J\x1b[H"
 
 /**
  * Returns the command prompt of this system

@@ -29,10 +29,12 @@
 #include <misc/printk.h>
 #include <ctype.h>
 
+#include "uart-uploader.h"
 #include "acm-shell.h"
 
 #define CMD_SET "set"
 #define CMD_TEST "test"
+#define CMD_CLEAR "clear"
 #define CMD_BLUETOOTH "bl"
 
 #define MAX_ARGUMENT_SIZE 32
@@ -76,6 +78,11 @@ void ashell_main_state(const char *buf, uint32_t len) {
 	if (!strcmp(CMD_SET, arg)) {
 		ashell_set_state(buf, argc, len);
 		return;
+	}
+
+	if (!strcmp(CMD_CLEAR, arg)) {
+		acm_print(ANSI_CLEAR);
+		return 0;
 	}
 
 #ifdef CONFIG_SHELL_UPLOADER_DEBUG

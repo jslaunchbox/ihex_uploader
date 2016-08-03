@@ -33,7 +33,7 @@
 
 void javascript_run_code(const char *file_name) {
   /* Initialize engine */
-    jerry_init (JERRY_INIT_EMPTY);	
+    jerry_init (JERRY_INIT_EMPTY);
 
 	CODE *code = csopen(file_name, "r");
 
@@ -44,7 +44,7 @@ void javascript_run_code(const char *file_name) {
 
 	/* Setup Global scope code */
 	jerry_value_t parsed_code = jerry_parse ((const jerry_char_t *) code, len, false);
-  
+
 	if (!jerry_value_has_error_flag (parsed_code))
 	{
 		/* Execute the parsed source code in the Global scope */

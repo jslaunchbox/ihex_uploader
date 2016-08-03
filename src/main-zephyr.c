@@ -121,7 +121,7 @@ static int shell_acm_command(int argc, char *argv[])
 
 static int shell_clear_command(int argc, char *argv[])
 {
-	printf("\x1b[2J\x1b[H");
+	printf(ANSI_CLEAR);
 	fflush(stdout);
 	return 0;
 }
