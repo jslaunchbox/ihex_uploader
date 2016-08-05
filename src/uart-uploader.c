@@ -244,7 +244,8 @@ static void interrupt_handler(struct device *dev) {
 		uart_state = UART_FIFO_READ;
 		while (bytes_read-- > 0) {
 			byte = *buf++;
-			if (byte == '\r' || byte == '\n')
+			if (byte == '\r' || byte == '\n' ||
+			   (byte >= CTRL_START && byte <= CTRL_END))
 				flush = true;
 		}
 
@@ -375,6 +376,8 @@ uint32_t uart_get_baudrate(void) {
 
 /* ACM TASK */
 void acm() {
+
+	printf("ACM Launch\n");
 	dev_upload = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
 
 	if (!dev_upload) {
@@ -389,7 +392,6 @@ void acm() {
 	uint32_t dtr = 0;
 	int ret;
 
-	printf("Wait for DTR\n");
 	while (1) {
 		uart_line_ctrl_get(dev_upload, LINE_CTRL_DTR, &dtr);
 		if (dtr)
@@ -416,7 +418,7 @@ void acm() {
 	uart_irq_tx_disable(dev_upload);
 
 	uart_irq_callback_set(dev_upload, interrupt_handler);
-	acm_write(banner, strlen(banner));
+	acm_write(banner, sizeof(banner));
 
 	/* Enable rx interrupts */
 	uart_irq_rx_enable(dev_upload);

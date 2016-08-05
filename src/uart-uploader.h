@@ -16,7 +16,40 @@
 #ifndef __UART_UPLOADER_H__
 #define __UART_UPLOADER_H__
 
- /**
+/* Control characters */
+/* http://www.physics.udel.edu/~watson/scen103/ascii.html */
+
+#define CTRL_START 0x00
+#define CTRL_END   0x1F
+
+/* Escape */
+#define ASCII_ESC                0x1b
+#define ASCII_DEL                0x7f
+
+/* CTLR-X */
+#define ASCII_CANCEL             0x18
+
+/* CTRL-B Start of text */
+#define ASCII_START_OF_TEXT      0x02
+
+/* CTRL-C End of text */
+#define ASCII_END_OF_TEXT        0x03
+
+/* CTLR-Z */
+#define ASCII_SUBSTITUTE         0x1A
+
+#define ASCII_CR                 '\r'
+#define ASCII_IF                 '\n'
+#define ASCII_TAB                '\t'
+
+/* ANSI escape sequences */
+#define ANSI_ESC           '['
+#define ANSI_UP            'A'
+#define ANSI_DOWN          'B'
+#define ANSI_FORWARD       'C'
+#define ANSI_BACKWARD      'D'
+
+/**
  * Ansi helpers
  * https://telepathy.freedesktop.org/doc/telepathy-glib/telepathy-glib-debug-ansi.html
  */
@@ -54,16 +87,16 @@ typedef uint32_t(*process_data_callback_t)(const char *buf, uint32_t len);
 typedef bool(*process_is_done)();
 
 /**
-* Callback function to pass an error from the transmision
-*/
+ * Callback function to pass an error from the transmision
+ */
 typedef uint32_t(*process_close_callback_t)();
 
 /* Callback to print debug data or state to the user */
 typedef void(*process_print_state_t)();
 
 /**
-* Process Status Codes
-*/
+ * Process Status Codes
+ */
 enum process_status_code {
 	PROCESS_ERROR,        /* Error during upload */
 	PROCESS_RESET,        /* Data reset */
@@ -72,14 +105,14 @@ enum process_status_code {
 };
 
 /**
-* Callback function with different status
-* When a new usb device is detected or when we are ready to receive data
-*/
+ * Callback function with different status
+ * When a new usb device is detected or when we are ready to receive data
+ */
 typedef void(*process_status_callback_t)(enum process_status_code status_code);
 
 /*
-* @brief Interfaces for the different uploaders and process handlers
-*/
+ * @brief Interfaces for the different uploaders and process handlers
+ */
 struct uploader_interface_cfg_data {
 	process_init_callback_t init_cb;
 	process_close_callback_t close_cb;

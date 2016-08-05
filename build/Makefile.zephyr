@@ -160,7 +160,7 @@ flash:	$(EXTERNAL_LIB) $(OUTPUT)/zephyr/zephyr.strip
 	make -f $(MAKE_FOLDER)/Makefile $(BUILD_CONFIG) flash
 
 debugserver:
-	make -f $(TARGET_ZEPHYR)/Makefile BOARD=$(BOARD_NAME) debugserver
+	make -f $(MAKE_FOLDER)/Makefile BOARD=$(BOARD_NAME) debugserver
 
 dfu-x86: all
 	@- dfu-util -a x86_app -D outdir/$(BOARD)/zephyr/zephyr.bin; \

@@ -47,6 +47,7 @@
 
 #include "uart-uploader.h"
 #include "ihex/kk_ihex_read.h"
+#include "acm-shell.h"
 
 #ifndef CONFIG_IHEX_UPLOADER_DEBUG
 #define DBG(...) { ; }
@@ -183,6 +184,8 @@ uint32_t ihex_process_finish() {
 	ihex_end_read(&ihex);
 	javascript_run_code(code_name);
 	printf("[CLOSE]\n");
+
+	ashell_process_start();
 	return 0;
 }
 

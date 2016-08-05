@@ -23,7 +23,7 @@ extern "C" {
  /**
  * Callback function when a line arrives
  */
-typedef void(*ashell_line_parser_t)(const char *buf, uint32_t len);
+typedef int32_t(*ashell_line_parser_t)(const char *buf, uint32_t len);
 
 void ashell_process_start();
 void ashell_register_app_line_handler(ashell_line_parser_t cb);

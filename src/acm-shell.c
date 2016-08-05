@@ -57,16 +57,6 @@ static ashell_line_parser_t app_line_cb = NULL;
 static char *shell_line = NULL;
 static uint8_t tail = 0;
 
-/* Control characters */
-#define ESC                0x1b
-#define DEL                0x7f
-
-/* ANSI escape sequences */
-#define ANSI_ESC           '['
-#define ANSI_UP            'A'
-#define ANSI_DOWN          'B'
-#define ANSI_FORWARD       'C'
-#define ANSI_BACKWARD      'D'
 
 static inline void cursor_forward(unsigned int count) {
 	for(int t=0; t<count; t++)
@@ -360,22 +350,22 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 		/* Handle special control characters */
 		if (!isprint(byte)) {
 			switch (byte) {
-				case DEL:
+				case ASCII_DEL:
 					if (cur > 0) {
 						del_char(&shell_line[--cur], end);
 					}
 					break;
-				case ESC:
+				case ASCII_ESC:
 					atomic_set_bit(&esc_state, ESC_ESC);
 					break;
-				case '\r':
+				case ASCII_CR:
 					DBG("<CR>\n");
 					flush_line = true;
 					break;
-				case '\t':
+				case ASCII_TAB:
 					acm_writec('\t');
 					break;
-				case '\n':
+				case ASCII_IF:
 					DBG("<IF>");
 					break;
 				default:
@@ -389,10 +379,13 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 			acm_write("\r\n", 3);
 
 			uint32_t length = strlen(shell_line);
+			int32_t ret = 0;
 			if (app_line_cb != NULL)
-				app_line_cb(shell_line, length);
+				ret = app_line_cb(shell_line, length);
 
-			ashell_process_line(shell_line, length);
+			if (ret <= 0)
+				ashell_process_line(shell_line, length);
+
 			cur = end = 0;
 			flush_line = false;
 		} else

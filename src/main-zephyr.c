@@ -29,9 +29,11 @@
 #define CONFIG_USE_JS_SHELL
 #define CONFIG_USE_IHEX_UPLOADER
 
- /**
-  * Jerryscript simple test loop
-  */
+ //#define CONFIG_USE_IHEX_LOADER_ONLY
+
+  /**
+   * Jerryscript simple test loop
+   */
 int jerryscript_test()
 {
 	jerry_value_t ret_val;
