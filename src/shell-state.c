@@ -31,14 +31,18 @@
 
 #include "uart-uploader.h"
 #include "acm-shell.h"
-#include "shell-state.h"
 #include "ihex-handler.h"
+#include "code-memory.h"
+#include "shell-state.h"
+#include "jerry-code.h"
 
 #define CMD_TRANSFER_IHEX  "ihex"
 #define CMD_TRANSFER_RAW   "raw"
 #define CMD_TRANSFER       "transfer"
 #define CMD_FILENAME       "filename"
 #define CMD_AT             "at"
+#define CMD_LS             "ls"
+#define CMD_RUN            "run"
 #define CMD_SET            "set"
 #define CMD_GET            "get"
 #define CMD_READ           "read"
@@ -46,6 +50,8 @@
 #define CMD_CLEAR          "clear"
 #define CMD_BLUETOOTH      "bl"
 #define CMD_HELP           "help"
+#define CMD_LOAD           "load"
+#define CMD_CAT            "cat"
 
 /* Configuration of the callbacks to be called */
 static struct shell_state_config shell = {
@@ -59,14 +65,97 @@ static struct shell_state_config shell = {
 
 const char ERROR_NOT_RECOGNIZED[] = "Unknown command";
 const char ERROR_NOT_ENOUGH_ARGUMENTS[] = "Not enough arguments";
-const char EXCEDEED_SIZE[] = "String too long";
+const char ERROR_FILE_NOT_FOUND[] = "File not found";
+const char ERROR_EXCEDEED_SIZE[] = "String too long";
+
 const char READY_FOR_RAW_DATA[] = "Ready for JavaScript." \
 			"\tCtrl+Z or <EOF> to finish transfer.\r\n" \
 			"\tCtrl+X or Ctrl+C to cancel.";
 
 const char READY_FOR_IHEX_DATA[] = "[BEGIN IHEX]";
+const char hex_prompt[] = "HEX> ";
 
 #define MAX_ARGUMENT_SIZE 32
+
+#define READ_BUFFER_SIZE 4
+int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
+	char data[READ_BUFFER_SIZE];
+	const char *filename;
+	CODE *file;
+	uint32_t arg_len;
+	size_t count;
+
+	if (len > MAX_NAME_SIZE) {
+		acm_println(ERROR_EXCEDEED_SIZE);
+		return RET_ERROR;
+	}
+
+	buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+	if (arg_len == 0) {
+		filename = shell.filename;
+	} else {
+		filename = arg;
+	}
+
+	file = csopen(filename, "r+");
+
+	// Error getting an id for our data storage
+	if (!file) {
+		acm_println(ERROR_FILE_NOT_FOUND);
+		return RET_ERROR;
+	}
+
+	if (file->curend == 0) {
+		acm_println("Empty file");
+		csclose(file);
+		return RET_ERROR;
+	}
+
+	do {
+		count = csread(data, 1, 4, file);
+		acm_write(data, count);
+	} while (count > 0);
+
+	csclose(file);
+
+	return RET_OK;
+}
+
+int32_t ashell_run_javascript(const char *buf, uint32_t len) {
+	char filename[MAX_NAME_SIZE];
+	uint32_t arg_len;
+
+	if (len > MAX_NAME_SIZE) {
+		acm_println(ERROR_EXCEDEED_SIZE);
+		return RET_ERROR;
+	}
+
+	buf = ashell_get_next_arg(buf, len, filename, &arg_len);
+	if (arg_len == 0) {
+		printf("[RUN][%s]\n", shell.filename);
+		javascript_run_code(shell.filename);
+		return RET_OK;
+	}
+
+	printf("[RUN][%s]\n", filename);
+	javascript_run_code(filename);
+	return RET_OK;
+}
+
+int32_t ashell_list_directory_contents(const char *buf, uint32_t len, char *arg) {
+	uint32_t arg_len;
+
+	buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+	if (arg_len == 0) {
+		acm_println("TODO: Not implemented");
+		return RET_OK;
+	}
+
+	CODE *file = csopen(arg, "r");
+	printf("%5d %s\n", file->curend , arg);
+	csclose(file);
+	return RET_OK;
+}
 
 int32_t ashell_help(const char *buf, uint32_t len) {
 	acm_println("TODO: Read help file!");
@@ -77,7 +166,7 @@ int32_t ashell_set_filename(const char *buf, uint32_t len) {
 	uint32_t arg_len;
 
 	if (len > MAX_NAME_SIZE) {
-		acm_println(EXCEDEED_SIZE);
+		acm_println(ERROR_EXCEDEED_SIZE);
 		return RET_ERROR;
 	}
 
@@ -90,6 +179,8 @@ int32_t ashell_set_filename(const char *buf, uint32_t len) {
 	acm_print("Filename [");
 	acm_print(shell.filename);
 	acm_println("]");
+
+	process_set_filename(shell.filename);
 	return RET_OK;
 }
 
@@ -102,6 +193,7 @@ int32_t ashell_read_data(const char *buf, uint32_t len, char *arg) {
 	if (shell.state_flags & kShellTransferIhex) {
 		acm_println(READY_FOR_IHEX_DATA);
 		ihex_process_start();
+		ashell_process_close();
 	}
 	return RET_OK;
 }
@@ -120,12 +212,14 @@ int32_t ashell_set_transfer_state(const char *buf, uint32_t len, char *arg) {
 	acm_println(arg);
 
 	if (!strcmp(CMD_TRANSFER_RAW, arg)) {
+		acm_set_prompt(NULL);
 		shell.state_flags |= kShellTransferRaw;
 		shell.state_flags &= ~kShellTransferIhex;
 		return RET_OK;
 	}
 
 	if (!strcmp(CMD_TRANSFER_IHEX, arg)) {
+		acm_set_prompt(hex_prompt);
 		shell.state_flags |= kShellTransferIhex;
 		shell.state_flags &= ~kShellTransferRaw;
 		return RET_OK;
@@ -233,6 +327,19 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	if (!strcmp(CMD_HELP, arg)) {
 		return ashell_help(buf, len);
 	}
+
+	if (!strcmp(CMD_RUN, arg)) {
+		return ashell_run_javascript(buf, len);
+	}
+
+	if (!strcmp(CMD_CAT, arg)) {
+		return ashell_print_file(buf, len, arg);
+	}
+
+	if (!strcmp(CMD_LS, arg)) {
+		return ashell_list_directory_contents(buf, len, arg);
+	}
+
 
 #ifdef CONFIG_SHELL_UPLOADER_DEBUG
 	printk("%u [%s] \n", arg_len, arg);

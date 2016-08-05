@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 #include <ctype.h>
 
@@ -34,7 +35,12 @@
 
 #include "code-memory.h"
 
-static struct code_memory memory_code;
+struct code_memory memory_code = {
+	.filename = "empty.txt",
+	.curoff = 0,
+	.curend = 0,
+	.maxsize = MAX_JAVASCRIPT_CODE_LEN
+};
 
 // Save into flash
 /*
@@ -45,8 +51,8 @@ int qm_flash_page_write(const qm_flash_t flash, const qm_flash_region_t region,
 
 CODE *csopen(const char * filename, const char * mode) {
 	memory_code.curoff = 0;
-	memory_code.curend = 0;
-	memory_code.maxsize = MAX_JAVASCRIPT_CODE_LEN;
+	strncpy(memory_code.filename, filename, MAX_NAME_SIZE);
+	csdescribe(&memory_code);
 	return &memory_code;
 }
 
@@ -95,10 +101,24 @@ size_t cswrite(const char * ptr, size_t size, size_t count, CODE * stream) {
 }
 
 size_t csread(char * ptr, size_t size, size_t count, CODE * stream) {
-	return (EOF);
+	size_t t = 0;
+
+	while (count-- > 0 && stream->curoff < stream->curend) {
+		ptr[t++] = stream->data[stream->curoff++];
+	}
+
+	return t;
+}
+
+void csdescribe(CODE * stream) {
+	printf("-----------------\n");
+	printf("File   [%s]\n", stream->filename);
+	printf("Cursor [%u]\n", stream->curoff);
+	printf("Size   [%u]\n", stream->curend);
 }
 
 int csclose(CODE * stream) {
+	csdescribe(stream);
 	return (EOF);
 }
 

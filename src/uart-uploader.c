@@ -74,7 +74,7 @@ const char *system_get_prompt() {
 	return system_prompt;
 }
 
-#define MAX_LINE_LEN 16
+#define MAX_LINE_LEN 64
 #define FIFO_CACHE 2
 
 /* Configuration of the callbacks to be called */
@@ -245,8 +245,10 @@ static void interrupt_handler(struct device *dev) {
 		while (bytes_read-- > 0) {
 			byte = *buf++;
 			if (byte == '\r' || byte == '\n' ||
-			   (byte >= CTRL_START && byte <= CTRL_END))
+				(byte >= CTRL_START && byte <= CTRL_END)) {
 				flush = true;
+				break;
+			}
 		}
 
 		uart_state = UART_FIFO_READ_END;
@@ -270,6 +272,9 @@ static void interrupt_handler(struct device *dev) {
  */
 
 void acm_write(const char *buf, int len) {
+	if (len == 0)
+		return;
+
 	struct device *dev = dev_upload;
 	uart_irq_tx_enable(dev);
 
@@ -297,6 +302,10 @@ void acm_println(const char *buf) {
 
 void process_set_config(struct uploader_cfg_data *config) {
 	memcpy(&uploader_config, config, sizeof(struct uploader_cfg_data));
+}
+
+void process_set_filename(const char *filename) {
+	uploader_config.filename = filename;
 }
 
 uint8_t uart_get_last_state() {

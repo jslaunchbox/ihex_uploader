@@ -21,7 +21,6 @@
  * and transactions.
  *
  */
-#define MAX_NAME_SIZE 16
 
 enum {
 	kShellTransferRaw = (1 << 0),

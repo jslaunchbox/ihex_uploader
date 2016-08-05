@@ -41,6 +41,12 @@ void javascript_run_code(const char *file_name) {
 		return;
 
 	size_t len = strlen((char *) code);
+	if (len != code->curend) {
+		printf("Size %u %u missmatch\n",
+			(unsigned int) len,
+			(unsigned int) code->curend);
+		return;
+	}
 
 	/* Setup Global scope code */
 	jerry_value_t parsed_code = jerry_parse ((const jerry_char_t *) code, len, false);

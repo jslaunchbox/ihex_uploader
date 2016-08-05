@@ -18,8 +18,11 @@
 
 #define MAX_JAVASCRIPT_CODE_LEN 4096
 
+#define MAX_NAME_SIZE 16
+
 struct code_memory {
 	char data[MAX_JAVASCRIPT_CODE_LEN];
+	char filename[MAX_NAME_SIZE];
 	uint8_t type;
 	uint16_t curoff;
 	uint16_t curend;
@@ -33,5 +36,6 @@ int csseek(CODE *stream, long int offset, int whence);
 size_t cswrite(const char *ptr, size_t size, size_t count, CODE *stream);
 size_t csread(char *ptr, size_t size, size_t count, CODE *stream);
 int csclose(CODE * stream);
+void csdescribe(CODE * stream);
 
 #endif

@@ -30,11 +30,19 @@
 #include <ctype.h>
 
 #include "uart-uploader.h"
+#include "code-memory.h"
 #include "acm-shell.h"
 #include "shell-state.h"
 
-const char acm_prompt[] = ANSI_FG_YELLOW "acm> " ANSI_FG_RESTORE;
+static const char acm_default_prompt[] = ANSI_FG_YELLOW "acm> " ANSI_FG_RESTORE;
+static const char *acm_prompt = NULL;
+void acm_set_prompt(const char *prompt) {
+	acm_prompt = prompt;
+}
+
 const char *acm_get_prompt() {
+	if (acm_prompt == NULL)
+		return acm_default_prompt;
 	return acm_prompt;
 }
 
@@ -56,6 +64,7 @@ const char *acm_get_prompt() {
 static ashell_line_parser_t app_line_cb = NULL;
 static char *shell_line = NULL;
 static uint8_t tail = 0;
+static bool ashell_is_done = false;
 
 
 static inline void cursor_forward(unsigned int count) {
@@ -313,6 +322,7 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 		DBG("[Proccess]%d\n", (int)len);
 		DBG("[%s]\n", buf);
 		shell_line = (char *)malloc(MAX_LINE);
+		memset(shell_line, 0, MAX_LINE);
 		tail = 0;
 	}
 
@@ -407,11 +417,12 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 
 
 bool ashell_process_is_done() {
-	return false;
+	return ashell_is_done;
 }
 
 
 uint32_t ashell_process_finish() {
+	printf("[SHELL CLOSE]\n");
 	return 0;
 }
 
@@ -430,9 +441,14 @@ void ashell_register_app_line_handler(ashell_line_parser_t cb) {
 	app_line_cb = cb;
 }
 
+void ashell_process_close() {
+	ashell_is_done = true;
+}
+
 void ashell_process_start() {
 	struct uploader_cfg_data cfg;
 
+	ashell_is_done = false;
 	cfg.cb_status = NULL;
 	cfg.interface.init_cb = ashell_process_init;
 	cfg.interface.error_cb = NULL;

@@ -143,6 +143,7 @@ struct uploader_cfg_data {
 };
 
 void process_set_config(struct uploader_cfg_data *config);
+void process_set_filename(const char *filename);
 
 uint32_t uart_get_baudrate(void);
 uint8_t uart_get_last_state();

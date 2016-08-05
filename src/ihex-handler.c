@@ -96,7 +96,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
 		ihex->data[ihex->length] = 0;
 
-		DBG("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
+		printf("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
 
 		csseek(code_memory, address, SEEK_SET);
 		cswrite(ihex->data, ihex->length, 1, code_memory);
@@ -122,6 +122,8 @@ void ihex_process_error(uint32_t error) {
 uint32_t ihex_process_init(const char *filename) {
 	upload_state = UPLOAD_START;
 	printf("[RDY]\n");
+	acm_println("[READY]");
+
 	ihex_begin_read(&ihex);
 
 	code_name = filename;
@@ -149,17 +151,17 @@ uint32_t ihex_process_data(const char *buf, uint32_t len) {
 
 		switch (byte) {
 			case ':':
-				DBG("<MK>");
+				printf("<MK>\n");
 				ihex_read_byte(&ihex, byte);
 				marker = true;
 				break;
 			case '\r':
 				marker = false;
-				DBG("<CR>");
+				printf("<CR>\n");
 				break;
 			case '\n':
 				marker = false;
-				DBG("<IF>");
+				printf("<IF>\n");
 				break;
 		}
 	}
@@ -173,6 +175,9 @@ bool ihex_process_is_done() {
 uint32_t ihex_process_finish() {
 	if (upload_state == UPLOAD_ERROR) {
 		printf("[Error] Callback handle error \n");
+		csclose(code_memory);
+
+		ashell_process_start();
 		return 1;
 	}
 
@@ -181,10 +186,9 @@ uint32_t ihex_process_finish() {
 
 	printf("[EOF]\n");
 	csclose(code_memory);
+	printf("[IHEX END]\n");
 	ihex_end_read(&ihex);
-	javascript_run_code(code_name);
 	printf("[CLOSE]\n");
-
 	ashell_process_start();
 	return 0;
 }
