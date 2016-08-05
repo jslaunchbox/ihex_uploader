@@ -183,6 +183,23 @@ set transfer raw
 set transfer snapshot
 ```
 
+### Read
+
+Starts transaction and save the data to memory or disk
+
+```
+read
+```
+
+#### Raw
+If the device is in RAW mode, it will wait for CTRL+Z or <EOF>
+to close the file.
+CTRL+X or CTRL+C will cancel the transaction and return to the command line.
+
+#### Ihex
+The device will output [BEGIN IHEX]
+And will process until end of file :00000001FF
+
 ### Getters
 
 ```
@@ -193,14 +210,6 @@ get filedata <filename>
 
 ``` 
 use filename <filename>
-``` 
-
-### Transactions
-
-``` 
-begin transaction
-<some data transfer>
-end transaction
 ``` 
 
 ### System
@@ -224,4 +233,18 @@ run
 Launches a debug server to step into the jerryscript code
 ``` 
 debug server
+``` 
+
+## Data transaction example using IHEX
+
+``` 
+set filename launchbox.hex
+set transfer ihex
+read    
+``` 
+<Send ihex data here>
+``` 
+use launchbox.hex
+parse
+run
 ``` 
