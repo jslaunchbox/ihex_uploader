@@ -283,9 +283,25 @@ int32_t ashell_get_state(const char *buf, uint32_t len, char *arg) {
 	return RET_UNKNOWN;
 }
 
+int32_t ashell_check_control(const char *buf, uint32_t len) {
+	while (len > 0) {
+		uint8_t byte = *buf++;
+		if (!isprint(byte)) {
+			switch (byte) {
+				case ASCII_SUBSTITUTE:
+					printf("Found <CTRL + Z>\n");
+				break;
+			}
+		}
+		len--;
+	}
+}
+
 int32_t ashell_main_state(const char *buf, uint32_t len) {
 	char arg[MAX_ARGUMENT_SIZE];
 	uint32_t argc, arg_len = 0;
+
+	ashell_check_control(buf, len);
 
 	printk("[ASHELL]");
 	argc = ashell_get_argc(buf, len);

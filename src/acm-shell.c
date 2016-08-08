@@ -291,7 +291,6 @@ uint32_t ashell_process_init(const char *filename) {
 	acm_set_prompt(acm_default_prompt);
 	acm_println("");
 	acm_print(acm_get_prompt());
-	shell_line = NULL;
 	return 0;
 }
 
@@ -383,6 +382,9 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 					DBG("<IF>");
 					break;
 				default:
+					printf("<CTRL> %u\n", byte);
+					flush_line = true;
+					shell_line[cur++] = byte;
 					break;
 			}
 		}
