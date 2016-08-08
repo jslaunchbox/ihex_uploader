@@ -111,13 +111,19 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 		return RET_ERROR;
 	}
 
+	csseek(file, 0, SEEK_SET);
 	do {
-		count = csread(data, 1, 4, file);
-		acm_write(data, count);
+		count = csread(data, 4, 1, file);
+		for (int t = 0; t < count; t++) {
+			if (data[t] == '\n')
+				acm_write("\r\n", 2);
+			else
+				acm_writec(data[t]);
+		}
 	} while (count > 0);
 
 	csclose(file);
-
+	acm_println("");
 	return RET_OK;
 }
 
@@ -192,7 +198,6 @@ int32_t ashell_read_data(const char *buf, uint32_t len, char *arg) {
 
 	if (shell.state_flags & kShellTransferIhex) {
 		acm_println(READY_FOR_IHEX_DATA);
-		ihex_process_start();
 		ashell_process_close();
 	}
 	return RET_OK;

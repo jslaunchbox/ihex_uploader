@@ -96,10 +96,16 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
 		ihex->data[ihex->length] = 0;
 
-		printf("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
+		printf("%d::%d:: \n%s \n", (int)address, ihex->length, ihex->data);
 
 		csseek(code_memory, address, SEEK_SET);
-		cswrite(ihex->data, ihex->length, 1, code_memory);
+		size_t written = cswrite(ihex->data, ihex->length, 1, code_memory);
+		if (written == 0) {
+			printf("Failed writting into file \n");
+			csdescribe(code_memory);
+			upload_state = UPLOAD_ERROR;
+			return false;
+		}
 	}
 	else if (type == IHEX_END_OF_FILE_RECORD) {
 		acm_println("[EOF]");

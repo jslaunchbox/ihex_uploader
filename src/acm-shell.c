@@ -33,6 +33,7 @@
 #include "code-memory.h"
 #include "acm-shell.h"
 #include "shell-state.h"
+#include "ihex-handler.h"
 
 static const char acm_default_prompt[] = ANSI_FG_YELLOW "acm> " ANSI_FG_RESTORE;
 static const char *acm_prompt = NULL;
@@ -287,6 +288,9 @@ const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, 
 
 uint32_t ashell_process_init(const char *filename) {
 	printf("[SHELL] Init\n");
+	acm_set_prompt(acm_default_prompt);
+	acm_println("");
+	acm_print(acm_get_prompt());
 	shell_line = NULL;
 	return 0;
 }
@@ -417,12 +421,16 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 
 
 bool ashell_process_is_done() {
+	if (ashell_is_done) {
+		printf("[Done]\n");
+	}
 	return ashell_is_done;
 }
 
 
 uint32_t ashell_process_finish() {
 	printf("[SHELL CLOSE]\n");
+	ihex_process_start();
 	return 0;
 }
 

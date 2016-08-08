@@ -50,6 +50,7 @@ int qm_flash_page_write(const qm_flash_t flash, const qm_flash_region_t region,
 */
 
 CODE *csopen(const char * filename, const char * mode) {
+	printf("[OPEN FILE]\n");
 	memory_code.curoff = 0;
 	strncpy(memory_code.filename, filename, MAX_NAME_SIZE);
 	csdescribe(&memory_code);
@@ -74,8 +75,8 @@ int csseek(CODE *stream, long int offset, int whence) {
 	if (stream->curoff < 0)
 		stream->curoff = 0;
 
-	if (stream->curoff >= stream->curend)
-		stream->curoff = stream->curend;
+	if (stream->curoff >= stream->maxsize)
+		stream->curoff = stream->maxsize;
 
 	return 0;
 }
@@ -103,6 +104,7 @@ size_t cswrite(const char * ptr, size_t size, size_t count, CODE * stream) {
 size_t csread(char * ptr, size_t size, size_t count, CODE * stream) {
 	size_t t = 0;
 
+	count *= size;
 	while (count-- > 0 && stream->curoff < stream->curend) {
 		ptr[t++] = stream->data[stream->curoff++];
 	}
@@ -111,13 +113,15 @@ size_t csread(char * ptr, size_t size, size_t count, CODE * stream) {
 }
 
 void csdescribe(CODE * stream) {
-	printf("-----------------\n");
 	printf("File   [%s]\n", stream->filename);
 	printf("Cursor [%u]\n", stream->curoff);
 	printf("Size   [%u]\n", stream->curend);
+	if (stream->maxsize != MAX_JAVASCRIPT_CODE_LEN)
+		printf("MaxSize[%u]\n", stream->maxsize);
 }
 
 int csclose(CODE * stream) {
+	printf("[CLOSE FILE]\n");
 	csdescribe(stream);
 	return (EOF);
 }
