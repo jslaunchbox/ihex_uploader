@@ -84,7 +84,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 	ihex_bool_t checksum_error) {
 	if (checksum_error) {
 		upload_state = UPLOAD_ERROR;
-		printf("[ERR] Checksum_error\n");
+		acm_println("[ERR] Checksum_error");
 		return false;
 	};
 
