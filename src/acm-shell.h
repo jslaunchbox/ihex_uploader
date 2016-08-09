@@ -34,7 +34,7 @@ void ashell_process_close();
 void ashell_register_app_line_handler(ashell_line_parser_t cb);
 
 uint32_t ashell_get_argc(const char *str, uint32_t nsize);
-const char *ashell_get_next_args(const char *str, uint32_t nsize, char *str_arg, uint32_t max_arg_size, uint32_t *length);
+const char *ashell_get_next_arg_s(const char *str, uint32_t nsize, char *str_arg, uint32_t max_arg_size, uint32_t *length);
 
 #ifdef __cplusplus
 }

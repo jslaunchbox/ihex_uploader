@@ -69,7 +69,7 @@ const char *system_get_prompt();
 /**
  * Callback function initialize the process
  */
-typedef uint32_t(*process_init_callback_t)(const char *filename);
+typedef uint32_t(*process_init_callback_t)();
 
 /**
 * Callback function to pass an error from the transmision
@@ -132,8 +132,6 @@ struct uploader_interface_cfg_data {
 */
 
 struct uploader_cfg_data {
-	/** Filename where we will be storing data */
-	const char *filename;
 	/** Callback to be notified on connection status change */
 	process_status_callback_t cb_status;
 	struct uploader_interface_cfg_data interface;
@@ -143,7 +141,6 @@ struct uploader_cfg_data {
 };
 
 void process_set_config(struct uploader_cfg_data *config);
-void process_set_filename(const char *filename);
 
 uint32_t uart_get_baudrate(void);
 uint8_t uart_get_last_state();

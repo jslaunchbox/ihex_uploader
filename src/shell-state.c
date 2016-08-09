@@ -185,8 +185,6 @@ int32_t ashell_set_filename(const char *buf, uint32_t len) {
 	acm_print("Filename [");
 	acm_print(shell.filename);
 	acm_println("]");
-
-	process_set_filename(shell.filename);
 	return RET_OK;
 }
 

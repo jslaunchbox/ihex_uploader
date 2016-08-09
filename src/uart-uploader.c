@@ -79,7 +79,6 @@ const char *system_get_prompt() {
 
 /* Configuration of the callbacks to be called */
 static struct uploader_cfg_data uploader_config = {
-	.filename = filename,
 	/** Callback to be notified on connection status change */
 	.cb_status = NULL,
 	.interface = {
@@ -304,10 +303,6 @@ void process_set_config(struct uploader_cfg_data *config) {
 	memcpy(&uploader_config, config, sizeof(struct uploader_cfg_data));
 }
 
-void process_set_filename(const char *filename) {
-	uploader_config.filename = filename;
-}
-
 uint8_t uart_get_last_state() {
 	return uart_state;
 }
@@ -336,7 +331,7 @@ void uart_uploader_runner(int arg1, int arg2) {
 		uart_state = UART_INIT;
 		if (uploader_config.interface.init_cb != NULL) {
 			DBG("[Init]\n");
-			uploader_config.interface.init_cb(uploader_config.filename);
+			uploader_config.interface.init_cb();
 		}
 
 		while (!uploader_config.interface.is_done()) {
@@ -352,12 +347,21 @@ void uart_uploader_runner(int arg1, int arg2) {
 				DBG("%s\n", buf);
 			}
 
-			bytes_processed += uploader_config.interface.process_cb(buf, len);
-			uart_process_done = true;
+			uint32_t processed = uploader_config.interface.process_cb(buf, len);
 
-			DBG("[Recycle]\n");
-			fifo_recycle_buffer(data);
-			data = NULL;
+			bytes_processed += processed;
+
+			if (uploader_config.interface.is_done()) {
+				len -= processed;
+				memcpy(buf, buf + processed, len);
+				buf[len] = '\0';
+				printf("New buf [%s]\n", buf);
+			} else {
+				uart_process_done = true;
+				DBG("[Recycle]\n");
+				fifo_recycle_buffer(data);
+				data = NULL;
+			}
 		}
 
 		uart_state = UART_CLOSE;

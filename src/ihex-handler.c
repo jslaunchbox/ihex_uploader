@@ -67,9 +67,6 @@
  */
 static CODE *code_memory = NULL;
 
-/* Filename where to store this data */
-static const char *code_name;
-
 /****************************** IHEX ****************************************/
 
 static bool marker = false;
@@ -125,15 +122,14 @@ void ihex_process_error(uint32_t error) {
 /*
 * Capture for the Intel Hex parser
 */
-uint32_t ihex_process_init(const char *filename) {
+uint32_t ihex_process_init() {
 	upload_state = UPLOAD_START;
 	printf("[RDY]\n");
 	acm_println("[READY]");
 
 	ihex_begin_read(&ihex);
 
-	code_name = filename;
-	code_memory = csopen(code_name, "w+");
+	code_memory = csopen("test.js", "w+");
 
 	/* Error getting an id for our data storage */
 	if (!code_memory) {

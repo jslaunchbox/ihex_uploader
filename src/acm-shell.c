@@ -287,17 +287,17 @@ const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, 
 * @return 0 Pointer to where this argument finishes
 */
 
-const char *ashell_get_next_args(const char *str, uint32_t nsize, char *str_arg, const uint32_t max_arg_size, uint32_t *length) {
+const char *ashell_get_next_arg_s(const char *str, uint32_t nsize, char *str_arg, const uint32_t max_arg_size, uint32_t *length) {
 	/* Check size and allocate for string termination */
 	if (nsize >= max_arg_size) {
 		nsize = max_arg_size - 1;
-		printf(" MAX \n");
+		DBG(" MAX \n");
 	}
 
 	return ashell_get_next_arg(str, nsize, str_arg, length);
 }
 
-uint32_t ashell_process_init(const char *filename) {
+uint32_t ashell_process_init() {
 	printf("[SHELL] Init\n");
 	acm_set_prompt(acm_default_prompt);
 	acm_println("");
@@ -317,7 +317,7 @@ void ashell_process_line(const char *buf, uint32_t len) {
 
 	printk("[ARGS %u]\n", argc);
 	for (int t = 0; t < argc; t++) {
-		buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
+		buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 		len -= arg_len;
 		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
 	}
@@ -413,13 +413,17 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 
 			cur = end = 0;
 			flush_line = false;
+			if (ashell_is_done) {
+				printf("Process is done \n");
+				break;
+			}
 		} else
 			if (isprint(byte)) {
 				/* Ignore characters if there's no more buffer space */
 				if (cur + end < MAX_LINE - 1) {
 					insert_char(&shell_line[cur++], byte, end);
 				} else {
-					printf("Max line\n");
+					DBG("Max line\n");
 				}
 			}
 
