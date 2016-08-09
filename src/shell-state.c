@@ -53,6 +53,12 @@
 #define CMD_LOAD           "load"
 #define CMD_CAT            "cat"
 
+/*
+ * Contains the pointer to the memory where the code will be uploaded
+ * using the stub interface at code_memory.c
+ */
+static CODE *code_memory = NULL;
+
 /* Configuration of the callbacks to be called */
 static struct shell_state_config shell = {
 	.filename = "test.js",
@@ -68,12 +74,16 @@ const char ERROR_NOT_ENOUGH_ARGUMENTS[] = "Not enough arguments";
 const char ERROR_FILE_NOT_FOUND[] = "File not found";
 const char ERROR_EXCEDEED_SIZE[] = "String too long";
 
+const char MSG_FILE_SAVED[] = ANSI_FG_GREEN "Saving file. " ANSI_FG_RESTORE "run the 'run' command to see the result";
+const char MSG_FILE_ABORTED[] = ANSI_FG_RED "Aborted!";
+
 const char READY_FOR_RAW_DATA[] = "Ready for JavaScript." \
 "\tCtrl+Z or <EOF> to finish transfer.\r\n" \
 "\tCtrl+X or Ctrl+C to cancel.";
 
 const char READY_FOR_IHEX_DATA[] = "[BEGIN IHEX]";
 const char hex_prompt[] = "HEX> ";
+const char raw_prompt[] = ANSI_FG_YELLOW "RAW> " ANSI_FG_RESTORE;
 
 #define MAX_ARGUMENT_SIZE 32
 
@@ -188,10 +198,74 @@ int32_t ashell_set_filename(const char *buf, uint32_t len) {
 	return RET_OK;
 }
 
+int32_t ashell_start_raw_capture() {
+	code_memory = csopen(shell.filename, "w+");
+
+	/* Error getting an id for our data storage */
+	if (!code_memory) {
+		return RET_ERROR;
+	}
+
+	return RET_OK;
+}
+
+int32_t ashell_close_capture() {
+	return csclose(code_memory);
+}
+
+int32_t ashell_discard_capture() {
+	csclose(code_memory);
+	/* TODO: Delete file
+	 return csdelete(shell.filename);
+	*/
+	return 0;
+}
+
+int32_t ashell_raw_capture(const char *buf, uint32_t len) {
+	while (len > 0) {
+		uint8_t byte = *buf++;
+		if (!isprint(byte)) {
+			switch (byte) {
+				case ASCII_SUBSTITUTE:
+					acm_println(MSG_FILE_SAVED);
+					shell.state_flags &= ~kShellCaptureRaw;
+					acm_set_prompt(NULL);
+					ashell_close_capture();
+					break;
+				case ASCII_END_OF_TEXT:
+				case ASCII_CANCEL:
+					acm_println(MSG_FILE_ABORTED);
+					shell.state_flags &= ~kShellCaptureRaw;
+					acm_set_prompt(NULL);
+					ashell_discard_capture();
+					break;
+				case ASCII_IF:
+					acm_println("");
+					break;
+				default:
+					printf("%c", byte);
+			}
+		} else {
+			size_t written = cswrite(&byte, 1, 1, code_memory);
+			if (written == 0) {
+				printf("Failed writting into file \n");
+				csdescribe(code_memory);
+				return RET_ERROR;
+			}
+			printf("%c", byte);
+		}
+		len--;
+	}
+	return 0;
+}
+
 int32_t ashell_read_data(const char *buf, uint32_t len, char *arg) {
 	if (shell.state_flags & kShellTransferRaw) {
 		acm_println(ANSI_CLEAR);
 		acm_println(READY_FOR_RAW_DATA);
+		acm_set_prompt(raw_prompt);
+		shell.state_flags |= kShellCaptureRaw;
+		ashell_start_raw_capture();
 	}
 
 	if (shell.state_flags & kShellTransferIhex) {
@@ -287,7 +361,7 @@ int32_t ashell_check_control(const char *buf, uint32_t len) {
 		if (!isprint(byte)) {
 			switch (byte) {
 				case ASCII_SUBSTITUTE:
-					printf("Found <CTRL + Z>\n");
+					acm_println("<CTRL + Z>\n");
 					break;
 			}
 		}
@@ -299,6 +373,11 @@ int32_t ashell_check_control(const char *buf, uint32_t len) {
 int32_t ashell_main_state(const char *buf, uint32_t len) {
 	char arg[MAX_ARGUMENT_SIZE];
 	uint32_t argc, arg_len = 0;
+
+	/* Capture data into the buffer */
+	if (shell.state_flags & kShellCaptureRaw) {
+		return ashell_raw_capture(buf, len);
+	}
 
 	if (len > MAX_ARGUMENT_SIZE) {
 		printk("[ASHELL]");
