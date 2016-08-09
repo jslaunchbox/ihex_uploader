@@ -90,7 +90,7 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 		return RET_ERROR;
 	}
 
-	buf = ashell_get_next_args(buf, len, arg, MAX_FILENAME_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_FILENAME_SIZE, &arg_len);
 	if (arg_len == 0) {
 		filename = shell.filename;
 	} else {
@@ -136,7 +136,7 @@ int32_t ashell_run_javascript(const char *buf, uint32_t len) {
 		return RET_ERROR;
 	}
 
-	buf = ashell_get_next_args(buf, len, filename, MAX_FILENAME_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, filename, MAX_FILENAME_SIZE, &arg_len);
 	if (arg_len == 0) {
 		printf("[RUN][%s]\n", shell.filename);
 		javascript_run_code(shell.filename);
@@ -151,7 +151,7 @@ int32_t ashell_run_javascript(const char *buf, uint32_t len) {
 int32_t ashell_list_directory_contents(const char *buf, uint32_t len, char *arg) {
 	uint32_t arg_len;
 
-	buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 	if (arg_len == 0) {
 		acm_println("TODO: Not implemented");
 		return RET_OK;
@@ -176,7 +176,7 @@ int32_t ashell_set_filename(const char *buf, uint32_t len) {
 		return RET_ERROR;
 	}
 
-	buf = ashell_get_next_args(buf, len, shell.filename, MAX_FILENAME_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, shell.filename, MAX_FILENAME_SIZE, &arg_len);
 	if (arg_len == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return RET_ERROR;
@@ -206,7 +206,7 @@ int32_t ashell_read_data(const char *buf, uint32_t len, char *arg) {
 int32_t ashell_set_transfer_state(const char *buf, uint32_t len, char *arg) {
 	uint32_t arg_len;
 
-	buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 	if (arg_len == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return -1;
@@ -236,7 +236,7 @@ int32_t ashell_set_transfer_state(const char *buf, uint32_t len, char *arg) {
 int32_t ashell_set_state(const char *buf, uint32_t len, char *arg) {
 	uint32_t arg_len;
 
-	buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 	if (arg_len == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return -1;
@@ -256,7 +256,7 @@ int32_t ashell_set_state(const char *buf, uint32_t len, char *arg) {
 int32_t ashell_get_state(const char *buf, uint32_t len, char *arg) {
 	uint32_t arg_len;
 
-	buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 	if (arg_len == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return -1;
@@ -317,7 +317,7 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	if (argc == 0)
 		return 0;
 
-	buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 	len -= arg_len;
 	argc--;
 
@@ -369,7 +369,7 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	printk("%u [%s] \n", arg_len, arg);
 
 	for (int t = 0; t < argc; t++) {
-		buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
+		buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 		len -= arg_len;
 		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
 	}
