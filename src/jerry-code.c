@@ -30,6 +30,38 @@
 #include "jerry-api.h"
 
 #include "code-memory.h"
+#include "acm-shell.h"
+
+extern void __stdout_hook_install(int(*fn)(int));
+
+/**
+*
+* @brief Output one character to UART
+*
+* Outputs both line feed and carriage return in the case of a '\n'.
+*
+* @param c Character to output
+*
+* @return The character passed as input.
+*/
+/*
+static int console_out(int c) {
+	int handled_by_debug_server = HANDLE_DEBUG_HOOK_OUT(c);
+
+	if (handled_by_debug_server) {
+		return c;
+	}
+
+	uart_poll_out(uart_console_dev, (unsigned char)c);
+	if ('\n' == c) {
+		uart_poll_out(uart_console_dev, (unsigned char)'\r');
+	}
+	return c;
+}
+*/
+static int acm_out(int c) {
+	return acm_writec(c);
+}
 
 void javascript_run_code(const char *file_name) {
 	/* Initialize engine */
@@ -52,6 +84,8 @@ void javascript_run_code(const char *file_name) {
 	jerry_value_t parsed_code = jerry_parse((const jerry_char_t *)code, len, false);
 
 	if (!jerry_value_has_error_flag(parsed_code)) {
+		__stdout_hook_install(acm_out);
+
 		/* Execute the parsed source code in the Global scope */
 		jerry_value_t ret_value = jerry_run(parsed_code);
 
