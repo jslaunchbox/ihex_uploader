@@ -276,6 +276,7 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 					acm_set_prompt(NULL);
 					ashell_discard_capture();
 					break;
+				case ASCII_CR:
 				case ASCII_IF:
 					acm_println("");
 					break;
@@ -293,6 +294,9 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 		}
 		len--;
 	}
+
+	uint8_t eol = '\n';
+	cswrite(&eol, 1, 1, code_memory);
 	return 0;
 }
 
