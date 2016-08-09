@@ -242,6 +242,7 @@ int32_t ashell_eval_javascript(const char *buf, uint32_t len) {
 		uint8_t byte = *buf++;
 		if (!isprint(byte)) {
 			switch (byte) {
+			case ASCII_SUBSTITUTE:
 			case ASCII_END_OF_TEXT:
 			case ASCII_CANCEL:
 				acm_println(MSG_EXIT);

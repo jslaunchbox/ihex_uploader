@@ -55,8 +55,6 @@ void javascript_eval_code(const char *source_buffer) {
 		strlen(source_buffer),
 		false);
 
-	free(source_buffer);
-
 	if (jerry_value_has_error_flag(ret_val)) {
 		printf("Failed to run JS\n");
 	}
@@ -65,9 +63,6 @@ void javascript_eval_code(const char *source_buffer) {
 }
 
 void javascript_run_code(const char *file_name) {
-	/* Initialize engine */
-	jerry_init(JERRY_INIT_EMPTY);
-
 	CODE *code = csopen(file_name, "r");
 
 	if (code == NULL)
@@ -102,6 +97,9 @@ void javascript_run_code(const char *file_name) {
 
 	/* Cleanup engine */
 	jerry_cleanup();
+
+	/* Initialize engine */
+	jerry_init(JERRY_INIT_EMPTY);
 
 	csclose(code);
 }
