@@ -33,6 +33,8 @@
 #include <device.h>
 #include <init.h>
 
+#include <misc/printk.h>
+
 #include "code-memory.h"
 
 struct code_memory memory_code = {
@@ -49,7 +51,7 @@ int qm_flash_page_write(const qm_flash_t flash, const qm_flash_region_t region,
 */
 
 CODE *csopen(const char * filename, const char * mode) {
-	printf("[OPEN FILE]\n");
+	printk("[OPEN FILE]\n");
 	memory_code.curoff = 0;
 
 	if (mode[0] == 'w') {
@@ -117,15 +119,15 @@ size_t csread(char * ptr, size_t size, size_t count, CODE * stream) {
 }
 
 void csdescribe(CODE * stream) {
-	printf("File   [%s]\n", stream->filename);
-	printf("Cursor [%u]\n", stream->curoff);
-	printf("Size   [%u]\n", stream->curend);
+	printk("File   [%s]\n", stream->filename);
+	printk("Cursor [%u]\n", stream->curoff);
+	printk("Size   [%u]\n", stream->curend);
 	if (stream->maxsize != MAX_JAVASCRIPT_CODE_LEN)
-		printf("MaxSize[%u]\n", stream->maxsize);
+		printk("MaxSize[%u]\n", stream->maxsize);
 }
 
 int csclose(CODE * stream) {
-	printf("[CLOSE FILE]\n");
+	printk("[CLOSE FILE]\n");
 	csdescribe(stream);
 	return (EOF);
 }
@@ -135,26 +137,26 @@ void main() {
 	CODE *myfile;
 
 	myfile = csopen("test.js", "w+");
-	printf(" Getting memory %p \n", myfile);
+	printk(" Getting memory %p \n", myfile);
 
 	cswrite("01234567890123456789\0", 21, sizeof(char), myfile);
-	printf("[%s] %i \n", myfile->data, myfile->curoff);
+	printk("[%s] %i \n", myfile->data, myfile->curoff);
 
 	csseek(myfile, 10, SEEK_SET);
 	cswrite("ABCDEFGHIK\0", 11, sizeof(char), myfile);
-	printf("[%s] %i \n", myfile->data, myfile->curoff);
+	printk("[%s] %i \n", myfile->data, myfile->curoff);
 
 	csseek(myfile, 5, SEEK_SET);
 	cswrite("01234", 5, sizeof(char), myfile);
-	printf("[%s] %i \n", myfile->data, myfile->curoff);
+	printk("[%s] %i \n", myfile->data, myfile->curoff);
 
 	cswrite("01234\0", 6, sizeof(char), myfile);
-	printf("[%s] %i \n", myfile->data, myfile->curoff);
+	printk("[%s] %i \n", myfile->data, myfile->curoff);
 
 	csseek(myfile, -10, SEEK_END);
 	cswrite("012345", 5, sizeof(char), myfile);
-	printf("[%s] %i \n", myfile->data, myfile->curoff);
+	printk("[%s] %i \n", myfile->data, myfile->curoff);
 
-	printf(" End \n");
+	printk(" End \n");
 }
 #endif

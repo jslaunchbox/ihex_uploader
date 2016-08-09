@@ -389,7 +389,6 @@ uint32_t uart_get_baudrate(void) {
 
 /* ACM TASK */
 void acm() {
-	printf("ACM Launch\n");
 	dev_upload = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
 
 	if (!dev_upload) {
@@ -420,7 +419,6 @@ void acm() {
 		printf("DSR Failed %d\n", ret);
 
 	/* Wait 1 sec for the host to do all settings */
-	printf("Start\n");
 	sys_thread_busy_wait(1000000);
 
 	uart_get_baudrate();

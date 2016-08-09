@@ -36,31 +36,15 @@ extern void __stdout_hook_install(int(*fn)(int));
 
 /**
 *
-* @brief Output one character to UART
-*
-* Outputs both line feed and carriage return in the case of a '\n'.
+* @brief Output one character to UART ACM
 *
 * @param c Character to output
-*
 * @return The character passed as input.
 */
-/*
-static int console_out(int c) {
-	int handled_by_debug_server = HANDLE_DEBUG_HOOK_OUT(c);
 
-	if (handled_by_debug_server) {
-		return c;
-	}
-
-	uart_poll_out(uart_console_dev, (unsigned char)c);
-	if ('\n' == c) {
-		uart_poll_out(uart_console_dev, (unsigned char)'\r');
-	}
-	return c;
-}
-*/
 static int acm_out(int c) {
-	return acm_writec(c);
+	acm_writec((char) c);
+	return 1;
 }
 
 void javascript_run_code(const char *file_name) {

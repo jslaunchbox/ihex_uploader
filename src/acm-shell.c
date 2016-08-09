@@ -321,7 +321,7 @@ void ashell_process_line(const char *buf, uint32_t len) {
 		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
 	}
 #endif
-	printk(system_get_prompt());
+	printk("\n%s", system_get_prompt());
 	acm_print(acm_get_prompt());
 }
 

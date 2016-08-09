@@ -88,6 +88,14 @@ const char raw_prompt[] = ANSI_FG_YELLOW "RAW> " ANSI_FG_RESTORE;
 #define MAX_ARGUMENT_SIZE 32
 
 #define READ_BUFFER_SIZE 4
+
+#ifndef CONFIG_IHEX_UPLOADER_DEBUG
+#define DBG(...) { ; }
+#else
+#include <misc/printk.h>
+#define DBG printk
+#endif /* CONFIG_IHEX_UPLOADER_DEBUG */
+
 int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 	char data[READ_BUFFER_SIZE];
 	const char *filename;
@@ -148,12 +156,12 @@ int32_t ashell_run_javascript(const char *buf, uint32_t len) {
 
 	buf = ashell_get_next_arg_s(buf, len, filename, MAX_FILENAME_SIZE, &arg_len);
 	if (arg_len == 0) {
-		printf("[RUN][%s]\n", shell.filename);
+		printk("[RUN][%s]\n", shell.filename);
 		javascript_run_code(shell.filename);
 		return RET_OK;
 	}
 
-	printf("[RUN][%s]\n", filename);
+	printk("[RUN][%s]\n", filename);
 	javascript_run_code(filename);
 	return RET_OK;
 }
@@ -361,7 +369,7 @@ int32_t ashell_check_control(const char *buf, uint32_t len) {
 		if (!isprint(byte)) {
 			switch (byte) {
 				case ASCII_SUBSTITUTE:
-					acm_println("<CTRL + Z>\n");
+					DBG("<CTRL + Z>");
 					break;
 			}
 		}
@@ -379,17 +387,13 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 		return ashell_raw_capture(buf, len);
 	}
 
-	if (len > MAX_ARGUMENT_SIZE) {
-		printk("[ASHELL]");
-	} else {
-		printk("[BOF]");
-		printk("%s", buf);
-		printk("[EOF]\n");
-		ashell_check_control(buf, len);
-	}
+	DBG("[BOF]");
+	DBG("%s", buf);
+	DBG("[EOF]");
+	ashell_check_control(buf, len);
 
 	argc = ashell_get_argc(buf, len);
-	printk("[ARGS %u]\n", argc);
+	DBG("[ARGS %u]\n", argc);
 
 	if (argc == 0)
 		return 0;
@@ -412,6 +416,7 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	}
 
 	if (!strcmp(CMD_AT, arg)) {
+		printk("AT OK\n");
 		acm_println("OK");
 		return RET_OK;
 	}
