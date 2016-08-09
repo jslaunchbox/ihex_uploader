@@ -183,12 +183,12 @@ set transfer raw
 set transfer snapshot
 ```
 
-### Read
+### Load contents
 
 Starts transaction and save the data to memory or disk
 
 ```
-read
+load
 ```
 
 #### Raw
@@ -199,6 +199,10 @@ CTRL+X or CTRL+C will cancel the transaction and return to the command line.
 #### Ihex
 The device will output [BEGIN IHEX]
 And will process until end of file :00000001FF
+There will be a command line like
+```
+HEX>
+```
 
 ### Getters
 

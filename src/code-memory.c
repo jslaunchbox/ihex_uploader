@@ -51,8 +51,13 @@ int qm_flash_page_write(const qm_flash_t flash, const qm_flash_region_t region,
 CODE *csopen(const char * filename, const char * mode) {
 	printf("[OPEN FILE]\n");
 	memory_code.curoff = 0;
+
+	if (mode[0] == 'w') {
+		memory_code.curend = 0;
+		memset(memory_code.data, 0, memory_code.maxsize);
+	}
+
 	strncpy(memory_code.filename, filename, MAX_FILENAME_SIZE);
-	csdescribe(&memory_code);
 	return &memory_code;
 }
 
@@ -129,7 +134,7 @@ int csclose(CODE * stream) {
 void main() {
 	CODE *myfile;
 
-	myfile = csopen("test.js", "rw+");
+	myfile = csopen("test.js", "w+");
 	printf(" Getting memory %p \n", myfile);
 
 	cswrite("01234567890123456789\0", 21, sizeof(char), myfile);

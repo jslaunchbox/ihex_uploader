@@ -80,8 +80,9 @@ static int8_t upload_state = 0;
 
 /* Data received from the buffer */
 ihex_bool_t ihex_data_read(struct ihex_state *ihex,
-	ihex_record_type_t type,
-	ihex_bool_t checksum_error) {
+						   ihex_record_type_t type,
+						   ihex_bool_t checksum_error) {
+
 	if (checksum_error) {
 		upload_state = UPLOAD_ERROR;
 		acm_println("[ERR] Checksum_error");
@@ -103,8 +104,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 			upload_state = UPLOAD_ERROR;
 			return false;
 		}
-	}
-	else if (type == IHEX_END_OF_FILE_RECORD) {
+	} else if (type == IHEX_END_OF_FILE_RECORD) {
 		acm_println("[EOF]");
 		upload_state = UPLOAD_FINISHED;
 	}

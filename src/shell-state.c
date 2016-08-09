@@ -45,7 +45,7 @@
 #define CMD_RUN            "run"
 #define CMD_SET            "set"
 #define CMD_GET            "get"
-#define CMD_READ           "read"
+#define CMD_LOAD           "load"
 #define CMD_TEST           "test"
 #define CMD_CLEAR          "clear"
 #define CMD_BLUETOOTH      "bl"
@@ -97,7 +97,7 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 		filename = arg;
 	}
 
-	file = csopen(filename, "r+");
+	file = csopen(filename, "r");
 
 	// Error getting an id for our data storage
 	if (!file) {
@@ -342,7 +342,7 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_READ, arg)) {
+	if (!strcmp(CMD_LOAD, arg)) {
 		return ashell_read_data(buf, len, arg);
 	}
 
