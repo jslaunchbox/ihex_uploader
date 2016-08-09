@@ -31,7 +31,7 @@ enum {
 
 struct shell_state_config {
 	/** Filename where we will be storing data */
-	char filename[MAX_NAME_SIZE];
+	char filename[MAX_FILENAME_SIZE];
 	uint32_t state_flags;
 };
 

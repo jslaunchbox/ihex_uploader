@@ -248,9 +248,9 @@ uint32_t ashell_get_argc(const char *str, uint32_t nsize) {
  *
  * @param str     Null terminated string
  * @param nsize   Checks line size boundaries.
- * @param str_arg Initialized destination for the argument
+ * @param str_arg Initialized destination for the argument. It always null terminates the string
  * @param length  Returns length of the argument found.
- * @return 0 Pointer to where this argument finishes
+ * @return 0      Pointer to where this argument finishes
  */
 
 const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, uint32_t *length) {
@@ -261,11 +261,12 @@ const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, 
 	}
 
 	/* Skip spaces */
-	while (nsize-- > 0 && *str != 0 && *str == ' ') {
+	while (nsize > 0 && *str != 0 && *str == ' ') {
 		str++;
+		nsize--;
 	}
 
-	while (nsize-- >= 0 && *str != ' ') {
+	while (nsize-- > 0 && *str != ' ') {
 		*str_arg++ = *str++;
 		(*length)++;
 		if (*str == 0)
@@ -274,6 +275,26 @@ const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, 
 
 	*str_arg = '\0';
 	return str;
+}
+
+/** @brief Safe function to copy the next argument into the string
+*
+* @param str          Null terminated string
+* @param nsize        Checks line size boundaries.
+* @param str_arg      Initialized destination for the argument
+* @param max_arg_size Limits the size of the variable to return
+* @param length	   Returns length of the argument found.
+* @return 0 Pointer to where this argument finishes
+*/
+
+const char *ashell_get_next_args(const char *str, uint32_t nsize, char *str_arg, const uint32_t max_arg_size, uint32_t *length) {
+	/* Check size and allocate for string termination */
+	if (nsize >= max_arg_size) {
+		nsize = max_arg_size - 1;
+		printf(" MAX \n");
+	}
+
+	return ashell_get_next_arg(str, nsize, str_arg, length);
 }
 
 uint32_t ashell_process_init(const char *filename) {
@@ -296,7 +317,7 @@ void ashell_process_line(const char *buf, uint32_t len) {
 
 	printk("[ARGS %u]\n", argc);
 	for (int t = 0; t < argc; t++) {
-		buf = ashell_get_next_arg(buf, len, arg, &arg_len);
+		buf = ashell_get_next_args(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
 		len -= arg_len;
 		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
 	}
@@ -472,16 +493,21 @@ struct shell_tests {
 
 const struct shell_tests test[] =
 {
+	/* Buffer overflow */
+	TEST_PARAMS("12345678901234567890123456789012345678901234567890123456789012345678901234567890", 32, 1),
 	TEST_PARAMS("test1 ( )", 10, 3),
 	TEST_PARAMS("hello world", 12, 2),
 	TEST_PARAMS("h  w", 5, 2),
 	TEST_PARAMS("hello", 6, 1),
-	TEST_PARAMS("test2 ( ) ", 8, 2), /* Cut the string */
+	/* Cut the string */
+	TEST_PARAMS("test2 ( ) ", 8, 2),
 	TEST_PARAMS("test3 ", 7, 1),
 	TEST_PARAMS(" test4", 7, 1),
+	TEST_PARAMS("test5 ( ) ", sizeof("test5 ( ) "), 3),
 	TEST_PARAMS(" ", 2, 0),
 	TEST_PARAMS("     ", 6, 0),
-	TEST_PARAMS(" ", 0, 0), /* Wrong string length */
+	/* Wrong string length */
+	TEST_PARAMS(" ", 0, 0),
 	TEST_PARAMS(NULL, 0, 0)
 };
 

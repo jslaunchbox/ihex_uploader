@@ -18,11 +18,11 @@
 
 #define MAX_JAVASCRIPT_CODE_LEN 4096
 
-#define MAX_NAME_SIZE 16
+#define MAX_FILENAME_SIZE 16
 
 struct code_memory {
 	char data[MAX_JAVASCRIPT_CODE_LEN];
-	char filename[MAX_NAME_SIZE];
+	char filename[MAX_FILENAME_SIZE];
 	uint8_t type;
 	uint16_t curoff;
 	uint16_t curend;
