@@ -17,29 +17,27 @@
 
 #include "jerry-port.h"
 
-/**
- * Provide log message to filestream implementation for the engine.
- */
-int jerry_port_logmsg (FILE *stream, const char *format, ...)
-{
-  va_list args;
-  int count;
-  va_start (args, format);
-  count = vfprintf (stream, format, args);
-  va_end (args);
-  return count;
+ /**
+  * Provide log message to filestream implementation for the engine.
+  */
+int jerry_port_logmsg(FILE *stream, const char *format, ...) {
+	va_list args;
+	int count;
+	va_start(args, format);
+	count = vfprintf(stream, format, args);
+	va_end(args);
+	return count;
 } /* jerry_port_logmsg */
 
 
 /**
  * Provide error message to console implementation for the engine.
  */
-int jerry_port_errormsg (const char *format, ...)
-{
-  va_list args;
-  int count;
-  va_start (args, format);
-  count = vfprintf (stderr, format, args);
-  va_end (args);
-  return count;
+int jerry_port_errormsg(const char *format, ...) {
+	va_list args;
+	int count;
+	va_start(args, format);
+	count = vfprintf(stderr, format, args);
+	va_end(args);
+	return count;
 } /* jerry_port_errormsg */

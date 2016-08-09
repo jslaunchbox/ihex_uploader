@@ -385,7 +385,6 @@ uint32_t uart_get_baudrate(void) {
 
 /* ACM TASK */
 void acm() {
-
 	printf("ACM Launch\n");
 	dev_upload = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
 

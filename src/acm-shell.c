@@ -59,7 +59,7 @@ const char *acm_get_prompt() {
 #endif /* CONFIG_STDOUT_CONSOLE */
 #endif /* CONFIG_SHELL_UPLOADER_DEBUG */
 
-#define MAX_LINE 128
+#define MAX_LINE 64
 #define MAX_ARGUMENT_SIZE 32
 
 static ashell_line_parser_t app_line_cb = NULL;
@@ -67,28 +67,23 @@ static char *shell_line = NULL;
 static uint8_t tail = 0;
 static bool ashell_is_done = false;
 
-
 static inline void cursor_forward(unsigned int count) {
-	for(int t=0; t<count; t++)
+	for (int t = 0; t < count; t++)
 		acm_print("\x1b[1C");
 }
 
-
 static inline void cursor_backward(unsigned int count) {
-	for (int t = 0; t<count; t++)
+	for (int t = 0; t < count; t++)
 		acm_print("\x1b[1D");
 }
-
 
 static inline void cursor_save(void) {
 	acm_print("\x1b[s");
 }
 
-
 static inline void cursor_restore(void) {
 	acm_print("\x1b[u");
 }
-
 
 static void insert_char(char *pos, char c, uint8_t end) {
 	char tmp;
@@ -116,7 +111,6 @@ static void insert_char(char *pos, char c, uint8_t end) {
 	/* Move cursor back to right place */
 	cursor_restore();
 }
-
 
 static void del_char(char *pos, uint8_t end) {
 	acm_writec('\b');
@@ -170,8 +164,7 @@ static void handle_ansi(uint8_t byte) {
 			if (atomic_test_bit(&esc_state, ESC_ANSI_VAL_2)) {
 				ansi_val_2 *= 10;
 				ansi_val_2 += byte - '0';
-			}
-			else {
+			} else {
 				ansi_val *= 10;
 				ansi_val += byte - '0';
 			}
@@ -215,7 +208,6 @@ ansi_cmd:
 	atomic_clear_bit(&esc_state, ESC_ANSI);
 }
 
-
 /** @brief Get the number of arguments in a string
  *
  * @param str   Null terminated string
@@ -230,7 +222,7 @@ uint32_t ashell_get_argc(const char *str, uint32_t nsize) {
 	uint32_t size = 1;
 	bool div = false;
 
-	// Skip the first spaces
+	/* Skip the first spaces */
 	while (nsize-- > 0 && *str != 0 && *str == ' ') {
 		str++;
 		if (size) {
@@ -251,7 +243,6 @@ uint32_t ashell_get_argc(const char *str, uint32_t nsize) {
 
 	return size;
 }
-
 
 /** @brief Copy the next argument into the string
  *
@@ -285,7 +276,6 @@ const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, 
 	return str;
 }
 
-
 uint32_t ashell_process_init(const char *filename) {
 	printf("[SHELL] Init\n");
 	acm_set_prompt(acm_default_prompt);
@@ -293,7 +283,6 @@ uint32_t ashell_process_init(const char *filename) {
 	acm_print(acm_get_prompt());
 	return 0;
 }
-
 
 void ashell_process_line(const char *buf, uint32_t len) {
 #ifdef CONFIG_SHELL_UPLOADER_DEBUG
@@ -309,13 +298,12 @@ void ashell_process_line(const char *buf, uint32_t len) {
 	for (int t = 0; t < argc; t++) {
 		buf = ashell_get_next_arg(buf, len, arg, &arg_len);
 		len -= arg_len;
-		printf(" Arg [%s]::%d \n", arg, (int) arg_len);
+		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
 	}
 #endif
 	printk(system_get_prompt());
 	acm_print(acm_get_prompt());
 }
-
 
 uint32_t ashell_process_data(const char *buf, uint32_t len) {
 	uint32_t processed = 0;
@@ -405,14 +393,18 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 			cur = end = 0;
 			flush_line = false;
 		} else
-		/* Ignore characters if there's no more buffer space */
-		if (isprint(byte) && cur + end < MAX_LINE - 1) {
-			insert_char(&shell_line[cur++], byte, end);
-		}
+			if (isprint(byte)) {
+				/* Ignore characters if there's no more buffer space */
+				if (cur + end < MAX_LINE - 1) {
+					insert_char(&shell_line[cur++], byte, end);
+				} else {
+					printf("Max line\n");
+				}
+			}
 
 	}
 
-	// Done processing line
+	/* Done processing line */
 	if (cur == 0 && end == 0 && shell_line != NULL) {
 		DBG("[Free]\n");
 		free(shell_line);
@@ -421,7 +413,6 @@ uint32_t ashell_process_data(const char *buf, uint32_t len) {
 	return processed;
 }
 
-
 bool ashell_process_is_done() {
 	if (ashell_is_done) {
 		printf("[Done]\n");
@@ -429,19 +420,17 @@ bool ashell_process_is_done() {
 	return ashell_is_done;
 }
 
-
 uint32_t ashell_process_finish() {
 	printf("[SHELL CLOSE]\n");
 	ihex_process_start();
 	return 0;
 }
 
-
 void ashell_print_status() {
 	printf("Shell Status\n");
 	printf("Tail %d\n", tail);
 	if (shell_line != NULL) {
-		printf("Line [%s]\n",shell_line);
+		printf("Line [%s]\n", shell_line);
 	} else {
 		printf("No data\n");
 	}
@@ -472,7 +461,6 @@ void ashell_process_start() {
 	ashell_register_app_line_handler(ashell_main_state);
 }
 
-
 #ifdef CONFIG_SHELL_UNIT_TESTS
 struct shell_tests {
 	char *str;
@@ -488,15 +476,14 @@ const struct shell_tests test[] =
 	TEST_PARAMS("hello world", 12, 2),
 	TEST_PARAMS("h  w", 5, 2),
 	TEST_PARAMS("hello", 6, 1),
-	TEST_PARAMS("test2 ( ) ", 8, 2), // Cut the string
+	TEST_PARAMS("test2 ( ) ", 8, 2), /* Cut the string */
 	TEST_PARAMS("test3 ", 7, 1),
 	TEST_PARAMS(" test4", 7, 1),
 	TEST_PARAMS(" ", 2, 0),
 	TEST_PARAMS("     ", 6, 0),
-	TEST_PARAMS(" ", 0, 0), // Wrong string length
+	TEST_PARAMS(" ", 0, 0), /* Wrong string length */
 	TEST_PARAMS(NULL, 0, 0)
 };
-
 
 void shell_unit_test() {
 	uint32_t t = 0;
@@ -506,9 +493,9 @@ void shell_unit_test() {
 		argc = ashell_get_argc(test[t].str, test[t].size);
 		if (argc != test[t].result) {
 			printf("Failed [%s] %d!=%d ",
-				test[t].str,
-				test[t].result,
-				argc);
+				   test[t].str,
+				   test[t].result,
+				   argc);
 			return;
 		}
 		t++;

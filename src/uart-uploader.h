@@ -16,8 +16,8 @@
 #ifndef __UART_UPLOADER_H__
 #define __UART_UPLOADER_H__
 
-/* Control characters */
-/* http://www.physics.udel.edu/~watson/scen103/ascii.html */
+ /* Control characters */
+ /* http://www.physics.udel.edu/~watson/scen103/ascii.html */
 
 #define CTRL_START 0x00
 #define CTRL_END   0x1F
@@ -61,9 +61,9 @@
 #define ANSI_FG_RESTORE "\x1b[39m"
 #define ANSI_CLEAR      "\x1b[2J\x1b[H"
 
-/**
- * Returns the command prompt of this system
- */
+ /**
+  * Returns the command prompt of this system
+  */
 const char *system_get_prompt();
 
 /**

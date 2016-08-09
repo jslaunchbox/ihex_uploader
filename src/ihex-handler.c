@@ -135,7 +135,7 @@ uint32_t ihex_process_init(const char *filename) {
 	code_name = filename;
 	code_memory = csopen(code_name, "w+");
 
-	// Error getting an id for our data storage
+	/* Error getting an id for our data storage */
 	if (!code_memory) {
 		upload_state = UPLOAD_ERROR;
 	}

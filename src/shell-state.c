@@ -69,8 +69,8 @@ const char ERROR_FILE_NOT_FOUND[] = "File not found";
 const char ERROR_EXCEDEED_SIZE[] = "String too long";
 
 const char READY_FOR_RAW_DATA[] = "Ready for JavaScript." \
-			"\tCtrl+Z or <EOF> to finish transfer.\r\n" \
-			"\tCtrl+X or Ctrl+C to cancel.";
+"\tCtrl+Z or <EOF> to finish transfer.\r\n" \
+"\tCtrl+X or Ctrl+C to cancel.";
 
 const char READY_FOR_IHEX_DATA[] = "[BEGIN IHEX]";
 const char hex_prompt[] = "HEX> ";
@@ -158,7 +158,7 @@ int32_t ashell_list_directory_contents(const char *buf, uint32_t len, char *arg)
 	}
 
 	CODE *file = csopen(arg, "r");
-	printf("%5d %s\n", file->curend , arg);
+	printf("%5d %s\n", file->curend, arg);
 	csclose(file);
 	return RET_OK;
 }
@@ -246,9 +246,9 @@ int32_t ashell_set_state(const char *buf, uint32_t len, char *arg) {
 	if (!strcmp(CMD_TRANSFER, arg)) {
 		return ashell_set_transfer_state(buf, len, arg);
 	} else
-	if (!strcmp(CMD_FILENAME, arg)) {
-		return ashell_set_filename(buf, len);
-	}
+		if (!strcmp(CMD_FILENAME, arg)) {
+			return ashell_set_filename(buf, len);
+		}
 
 	return RET_UNKNOWN;
 }
@@ -290,20 +290,24 @@ int32_t ashell_check_control(const char *buf, uint32_t len) {
 			switch (byte) {
 				case ASCII_SUBSTITUTE:
 					printf("Found <CTRL + Z>\n");
-				break;
+					break;
 			}
 		}
 		len--;
 	}
+	return 0;
 }
 
 int32_t ashell_main_state(const char *buf, uint32_t len) {
 	char arg[MAX_ARGUMENT_SIZE];
 	uint32_t argc, arg_len = 0;
 
-	ashell_check_control(buf, len);
+	if (len > 60) {
+		printk("[ASHELL]");
+	} else {
+		ashell_check_control(buf, len);
+	}
 
-	printk("[ASHELL]");
 	argc = ashell_get_argc(buf, len);
 	printk("[ARGS %u]\n", argc);
 

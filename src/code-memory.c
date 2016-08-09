@@ -42,8 +42,7 @@ struct code_memory memory_code = {
 	.maxsize = MAX_JAVASCRIPT_CODE_LEN
 };
 
-// Save into flash
-/*
+/* Save into flash
 int qm_flash_page_write(const qm_flash_t flash, const qm_flash_region_t region,
 	uint32_t page_num, const uint32_t *const data,
 	uint32_t len)
@@ -59,17 +58,17 @@ CODE *csopen(const char * filename, const char * mode) {
 
 int csseek(CODE *stream, long int offset, int whence) {
 	switch (whence) {
-	case SEEK_CUR:
-		stream->curoff += offset;
-		break;
-	case SEEK_SET:
-		stream->curoff = offset;
-		break;
-	case SEEK_END:
-		stream->curoff = stream->curend + offset;
-		break;
-	default:
-		return (EOF);
+		case SEEK_CUR:
+			stream->curoff += offset;
+			break;
+		case SEEK_SET:
+			stream->curoff = offset;
+			break;
+		case SEEK_END:
+			stream->curoff = stream->curend + offset;
+			break;
+		default:
+			return (EOF);
 	}
 
 	if (stream->curoff < 0)

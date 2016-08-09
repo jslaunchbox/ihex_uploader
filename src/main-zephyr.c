@@ -34,8 +34,7 @@
   /**
    * Jerryscript simple test loop
    */
-int jerryscript_test()
-{
+int jerryscript_test() {
 	jerry_value_t ret_val;
 
 	const char script[] =
@@ -45,8 +44,8 @@ int jerryscript_test()
 
 	printf("Script [%s]\n", script);
 	ret_val = jerry_eval((jerry_char_t *)script,
-		strlen(script),
-		false);
+						 strlen(script),
+						 false);
 
 	return jerry_value_has_error_flag(ret_val) ? -1 : 0;
 }
@@ -57,33 +56,29 @@ int jerryscript_test()
 static char *source_buffer = NULL;
 static unsigned char flags = 0;
 
-static int shell_cmd_verbose(int argc, char *argv[])
-{
+static int shell_cmd_verbose(int argc, char *argv[]) {
 	printf("Enable verbose \n");
 	flags |= VERBOSE;
 	return 0;
 }
 
-static int shell_cmd_syntax_help(int argc, char *argv[])
-{
+static int shell_cmd_syntax_help(int argc, char *argv[]) {
 	printf("version jerryscript & zephyr versions\n");
 	return 0;
 }
 
-static int shell_cmd_version(int argc, char *argv[])
-{
+static int shell_cmd_version(int argc, char *argv[]) {
 	uint32_t version = sys_kernel_version_get();
 
 	printf("Jerryscript API %d.%d\n", JERRY_API_MAJOR_VERSION, JERRY_API_MINOR_VERSION);
 
 	printf("Zephyr version %d.%d.%d\n", (int)SYS_KERNEL_VER_MAJOR(version),
 		(int)SYS_KERNEL_VER_MINOR(version),
-		(int)SYS_KERNEL_VER_PATCHLEVEL(version));
+		   (int)SYS_KERNEL_VER_PATCHLEVEL(version));
 	return 0;
 }
 
-static int shell_acm_command(int argc, char *argv[])
-{
+static int shell_acm_command(int argc, char *argv[]) {
 	if (argc <= 1)
 		return -1;
 
@@ -121,28 +116,23 @@ static int shell_acm_command(int argc, char *argv[])
 	return 0;
 } /* shell_acm_command */
 
-static int shell_clear_command(int argc, char *argv[])
-{
+static int shell_clear_command(int argc, char *argv[]) {
 	printf(ANSI_CLEAR);
 	fflush(stdout);
 	return 0;
 }
 
-static int shell_cmd_test(int argc, char *argv[])
-{
+static int shell_cmd_test(int argc, char *argv[]) {
 	return jerryscript_test();
 } /* shell_cmd_test */
 
-static int shell_cmd_handler(int argc, char *argv[])
-{
-	if (argc <= 0)
-	{
+static int shell_cmd_handler(int argc, char *argv[]) {
+	if (argc <= 0) {
 		return -1;
 	}
 
 	unsigned int size = 0;
-	for (int t = 0; t < argc; t++)
-	{
+	for (int t = 0; t < argc; t++) {
 		size += strlen(argv[t]) + 1;
 	}
 
@@ -151,8 +141,7 @@ static int shell_cmd_handler(int argc, char *argv[])
 	char *d = source_buffer;
 	unsigned int len;
 
-	for (int t = 0; t < argc; t++)
-	{
+	for (int t = 0; t < argc; t++) {
 		len = strlen(argv[t]);
 		memcpy(d, argv[t], len);
 		d += len;
@@ -162,21 +151,19 @@ static int shell_cmd_handler(int argc, char *argv[])
 
 	*(d - 1) = '\0';
 
-	if (flags & VERBOSE)
-	{
+	if (flags & VERBOSE) {
 		printf("[%s] %lu\n", source_buffer, strlen(source_buffer));
 	}
 
 	jerry_value_t ret_val;
 
 	ret_val = jerry_eval((jerry_char_t *)source_buffer,
-		strlen(source_buffer),
-		false);
+						 strlen(source_buffer),
+						 false);
 
 	free(source_buffer);
 
-	if (jerry_value_has_error_flag(ret_val))
-	{
+	if (jerry_value_has_error_flag(ret_val)) {
 		printf("Failed to run JS\n");
 	}
 
@@ -200,8 +187,7 @@ const struct shell_cmd commands[] =
 };
 #endif
 
-void main(void)
-{
+void main(void) {
 #ifdef CONFIG_USE_JS_SHELL
 	jerry_init(JERRY_INIT_EMPTY);
 	shell_clear_command(0, 0);
