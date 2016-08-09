@@ -47,6 +47,23 @@ static int acm_out(int c) {
 	return 1;
 }
 
+void javascript_eval_code(const char *source_buffer) {
+	jerry_value_t ret_val;
+
+	__stdout_hook_install(acm_out);
+	ret_val = jerry_eval((jerry_char_t *)source_buffer,
+		strlen(source_buffer),
+		false);
+
+	free(source_buffer);
+
+	if (jerry_value_has_error_flag(ret_val)) {
+		printf("Failed to run JS\n");
+	}
+
+	jerry_release_value(ret_val);
+}
+
 void javascript_run_code(const char *file_name) {
 	/* Initialize engine */
 	jerry_init(JERRY_INIT_EMPTY);

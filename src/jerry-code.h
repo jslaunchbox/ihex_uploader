@@ -17,5 +17,6 @@
 #define __JERRY_CODE_RUNNER_H__
 
 void javascript_run_code(const char *file_name);
+void javascript_eval_code(const char *source_buffer);
 
 #endif

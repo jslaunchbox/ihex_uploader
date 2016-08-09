@@ -69,7 +69,7 @@ const char filename[] = "jerry.js";
 
 // Jerryscript in green color
 
-const char system_prompt[] = ANSI_FG_GREEN "js> " ANSI_FG_RESTORE;
+const char system_prompt[] = ANSI_FG_GREEN "shell> " ANSI_FG_RESTORE;
 const char *system_get_prompt() {
 	return system_prompt;
 }

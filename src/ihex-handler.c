@@ -94,7 +94,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
 		ihex->data[ihex->length] = 0;
 
-		printf("%d::%d:: \n%s \n", (int)address, ihex->length, ihex->data);
+		printk("%d::%d:: \n%s \n", (int)address, ihex->length, ihex->data);
 
 		csseek(code_memory, address, SEEK_SET);
 		size_t written = cswrite(ihex->data, ihex->length, 1, code_memory);
@@ -124,7 +124,7 @@ void ihex_process_error(uint32_t error) {
 */
 uint32_t ihex_process_init() {
 	upload_state = UPLOAD_START;
-	printf("[RDY]\n");
+	printk("[READY]\n");
 	acm_println("[READY]");
 
 	ihex_begin_read(&ihex);
@@ -153,17 +153,17 @@ uint32_t ihex_process_data(const char *buf, uint32_t len) {
 
 		switch (byte) {
 			case ':':
-				printf("<MK>\n");
+				DBG("<MK>\n");
 				ihex_read_byte(&ihex, byte);
 				marker = true;
 				break;
 			case '\r':
 				marker = false;
-				printf("<CR>\n");
+				DBG("<CR>\n");
 				break;
 			case '\n':
 				marker = false;
-				printf("<IF>\n");
+				DBG("<IF>\n");
 				break;
 		}
 	}
@@ -186,11 +186,9 @@ uint32_t ihex_process_finish() {
 	if (upload_state != UPLOAD_FINISHED)
 		return 1;
 
-	printf("[EOF]\n");
 	csclose(code_memory);
-	printf("[IHEX END]\n");
 	ihex_end_read(&ihex);
-	printf("[CLOSE]\n");
+	printf("[EOF]\n");
 	ashell_process_start();
 	return 0;
 }

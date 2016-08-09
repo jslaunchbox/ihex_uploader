@@ -298,7 +298,7 @@ const char *ashell_get_next_arg_s(const char *str, uint32_t nsize, char *str_arg
 }
 
 uint32_t ashell_process_init() {
-	printf("[SHELL] Init\n");
+	DBG("[SHELL] Init\n");
 	acm_println("");
 	acm_print(acm_get_prompt());
 	return 0;

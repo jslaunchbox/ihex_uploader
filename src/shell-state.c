@@ -52,6 +52,7 @@
 #define CMD_HELP           "help"
 #define CMD_LOAD           "load"
 #define CMD_CAT            "cat"
+#define CMD_EVAL           "eval"
 
 /*
  * Contains the pointer to the memory where the code will be uploaded
@@ -76,14 +77,19 @@ const char ERROR_EXCEDEED_SIZE[] = "String too long";
 
 const char MSG_FILE_SAVED[] = ANSI_FG_GREEN "Saving file. " ANSI_FG_RESTORE "run the 'run' command to see the result";
 const char MSG_FILE_ABORTED[] = ANSI_FG_RED "Aborted!";
+const char MSG_EXIT[] = ANSI_FG_GREEN "Back to shell!";
 
-const char READY_FOR_RAW_DATA[] = "Ready for JavaScript." \
+const char READY_FOR_RAW_DATA[] = "Ready for JavaScript. \r\n" \
 "\tCtrl+Z or <EOF> to finish transfer.\r\n" \
 "\tCtrl+X or Ctrl+C to cancel.";
+
+const char MSG_IMMEDIATE_MODE[] = "Ready to evaluate JavaScript.\r\n" \
+"\tCtrl+X or Ctrl+C to return to shell.";
 
 const char READY_FOR_IHEX_DATA[] = "[BEGIN IHEX]";
 const char hex_prompt[] = "HEX> ";
 const char raw_prompt[] = ANSI_FG_YELLOW "RAW> " ANSI_FG_RESTORE;
+const char eval_prompt[] = ANSI_FG_GREEN "js> " ANSI_FG_RESTORE;
 
 #define MAX_ARGUMENT_SIZE 32
 
@@ -156,12 +162,12 @@ int32_t ashell_run_javascript(const char *buf, uint32_t len) {
 
 	buf = ashell_get_next_arg_s(buf, len, filename, MAX_FILENAME_SIZE, &arg_len);
 	if (arg_len == 0) {
-		printk("[RUN][%s]\n", shell.filename);
+		printk("[RUN][%s]\r\n", shell.filename);
 		javascript_run_code(shell.filename);
 		return RET_OK;
 	}
 
-	printk("[RUN][%s]\n", filename);
+	printk("[RUN][%s]\r\n", filename);
 	javascript_run_code(filename);
 	return RET_OK;
 }
@@ -229,6 +235,28 @@ int32_t ashell_discard_capture() {
 	return 0;
 }
 
+int32_t ashell_eval_javascript(const char *buf, uint32_t len) {
+	const char *src = buf;
+
+	while (len > 0) {
+		uint8_t byte = *buf++;
+		if (!isprint(byte)) {
+			switch (byte) {
+			case ASCII_END_OF_TEXT:
+			case ASCII_CANCEL:
+				acm_println(MSG_EXIT);
+				shell.state_flags &= ~kShellEvalJavascript;
+				acm_set_prompt(NULL);
+				return 0;
+			}
+		}
+		len--;
+	}
+
+	javascript_eval_code(src);
+	return 0;
+}
+
 int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 	while (len > 0) {
 		uint8_t byte = *buf++;
@@ -281,6 +309,14 @@ int32_t ashell_read_data(const char *buf, uint32_t len, char *arg) {
 		ashell_process_close();
 	}
 	return RET_OK;
+}
+
+int32_t ashell_js_immediate_mode(const char *buf, uint32_t len) {
+	shell.state_flags |= kShellEvalJavascript;
+	acm_print(ANSI_CLEAR);
+	acm_println(MSG_IMMEDIATE_MODE);
+	acm_set_prompt(eval_prompt);
+	return 0;
 }
 
 int32_t ashell_set_transfer_state(const char *buf, uint32_t len, char *arg) {
@@ -382,6 +418,10 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	char arg[MAX_ARGUMENT_SIZE];
 	uint32_t argc, arg_len = 0;
 
+	if (shell.state_flags & kShellEvalJavascript) {
+		return ashell_eval_javascript(buf, len);
+	}
+
 	/* Capture data into the buffer */
 	if (shell.state_flags & kShellCaptureRaw) {
 		return ashell_raw_capture(buf, len);
@@ -416,7 +456,7 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	}
 
 	if (!strcmp(CMD_AT, arg)) {
-		printk("AT OK\n");
+		printf("AT OK\r\n");
 		acm_println("OK");
 		return RET_OK;
 	}
@@ -446,9 +486,12 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 		return ashell_list_directory_contents(buf, len, arg);
 	}
 
+	if (!strcmp(CMD_EVAL, arg)) {
+		return ashell_js_immediate_mode(buf, len);
+	}
 
 #ifdef CONFIG_SHELL_UPLOADER_DEBUG
-	printk("%u [%s] \n", arg_len, arg);
+	printk("%u [%s] \r\n", arg_len, arg);
 
 	for (int t = 0; t < argc; t++) {
 		buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);

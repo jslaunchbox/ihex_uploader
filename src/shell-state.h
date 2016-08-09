@@ -26,7 +26,8 @@ enum {
 	kShellTransferRaw = (1 << 0),
 	kShellTransferIhex = (1 << 1),
 	kShellTransferSnapshot = (1 << 2),
-	kShellCaptureRaw = (1 << 3)
+	kShellCaptureRaw = (1 << 3),
+	kShellEvalJavascript = (1 << 4),
 };
 
 struct shell_state_config {
