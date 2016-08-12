@@ -123,6 +123,23 @@ static int shell_clear_command(int argc, char *argv[]) {
 }
 
 static int shell_cmd_test(int argc, char *argv[]) {
+#ifdef TEST_SIZES
+	printf("[time_t] %lu\n", sizeof(time_t));
+	printf("[BYTE] %lu\n", sizeof(BYTE));
+	printf("[DWORD] %lu\n", sizeof(DWORD));
+	printf("[UINT] %lu\n", sizeof(UINT));
+
+	printf("[uint8_t] %lu\n", sizeof(uint8_t));
+	printf("[uint16_t] %lu\n", sizeof(uint16_t));
+	printf("[uint32_t] %lu\n", sizeof(uint32_t));
+	printf("[uint64_t] %lu\n", sizeof(uint64_t));
+
+	printf("[CHAR] %lu\n", sizeof(char));
+	printf("[INT] %lu\n", sizeof(int));
+	printf("[LONG] %lu\n", sizeof(long));
+	printf("[LONG INT] %lu\n", sizeof(long int));
+	printf("[LONG LONG] %lu\n", sizeof(long long));
+#endif
 	return jerryscript_test();
 } /* shell_cmd_test */
 

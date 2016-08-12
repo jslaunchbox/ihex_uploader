@@ -37,5 +37,6 @@ struct shell_state_config {
 };
 
 int32_t ashell_main_state(const char *buf, uint32_t len);
+const char *ashell_get_filename();
 
 #endif

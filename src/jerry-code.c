@@ -63,21 +63,27 @@ void javascript_eval_code(const char *source_buffer) {
 }
 
 void javascript_run_code(const char *file_name) {
-	CODE *code = csopen(file_name, "r");
-
-	if (code == NULL)
+	CODE *fp = csopen(file_name, "r");
+	if (fp == NULL)
 		return;
 
-	size_t len = strlen((char *)code);
-	if (len != code->curend) {
-		printf("Size %u %u missmatch\n",
-			(unsigned int)len,
-			   (unsigned int)code->curend);
+	fs_seek(fp, 0, SEEK_END);
+	off_t len = fs_tell(fp);
+	if (len == 0)
+		return;
+
+	char *buf = (char *) malloc(len);
+
+	ssize_t brw = fs_read(fp, buf, len);
+	if (brw < 0) {
+		fs_close(fp);
+		printf(" Failed loading code from disk %s ", file_name);
 		return;
 	}
 
 	/* Setup Global scope code */
-	jerry_value_t parsed_code = jerry_parse((const jerry_char_t *)code, len, false);
+	jerry_value_t parsed_code = jerry_parse((const jerry_char_t *)buf, len, false);
+	free(buf);
 
 	if (!jerry_value_has_error_flag(parsed_code)) {
 		__stdout_hook_install(acm_out);
@@ -100,8 +106,6 @@ void javascript_run_code(const char *file_name) {
 
 	/* Initialize engine */
 	jerry_init(JERRY_INIT_EMPTY);
-
-	csclose(code);
 }
 
 void javascript_run_snapshot(const char *file_name) {

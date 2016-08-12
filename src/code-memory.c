@@ -37,99 +37,85 @@
 
 #include "code-memory.h"
 
-struct code_memory memory_code = {
-	.filename = "empty.txt",
-	.curoff = 0,
-	.curend = 0,
-	.maxsize = MAX_JAVASCRIPT_CODE_LEN
-};
-
-/* Save into flash
-int qm_flash_page_write(const qm_flash_t flash, const qm_flash_region_t region,
-	uint32_t page_num, const uint32_t *const data,
-	uint32_t len)
-*/
+int csexist(const char *path)
+{
+	int res;
+	struct zfs_dirent entry;
+	res = fs_stat(path, &entry);
+	return !res;
+}
 
 CODE *csopen(const char * filename, const char * mode) {
 	printk("[OPEN FILE]\n");
-	memory_code.curoff = 0;
+	struct zfs_dirent entry;
+	int res;
 
+	/* Delete file if exists */
 	if (mode[0] == 'w') {
-		memory_code.curend = 0;
-		memset(memory_code.data, 0, memory_code.maxsize);
+		res = fs_stat(filename, &entry);
+		if (res) {
+			/* Delete the file and verify checking its status */
+			res = fs_unlink(filename);
+			if (res) {
+				printk("Error deleting file [%d]\n", res);
+				return res;
+			}
+		}
 	}
 
-	strncpy(memory_code.filename, filename, MAX_FILENAME_SIZE);
-	return &memory_code;
+	CODE *code = (CODE *)malloc(sizeof(CODE));
+	res = fs_open(code, filename);
+	if (res) {
+		printk("Failed opening file [%d]\n", res);
+		return NULL;
+	}
+	return code;
 }
 
-int csseek(CODE *stream, long int offset, int whence) {
-	switch (whence) {
-		case SEEK_CUR:
-			stream->curoff += offset;
-			break;
-		case SEEK_SET:
-			stream->curoff = offset;
-			break;
-		case SEEK_END:
-			stream->curoff = stream->curend + offset;
-			break;
-		default:
-			return (EOF);
+int csseek(CODE *fp, long int offset, int whence) {
+	int res = fs_seek(fp, offset, SEEK_SET);
+	if (res) {
+		printk("fs_seek failed [%d]\n", res);
+		fs_close(fp);
+		return res;
 	}
-
-	if (stream->curoff < 0)
-		stream->curoff = 0;
-
-	if (stream->curoff >= stream->maxsize)
-		stream->curoff = stream->maxsize;
 
 	return 0;
 }
 
-size_t cswrite(const char * ptr, size_t size, size_t count, CODE * stream) {
-	unsigned int t;
-
+ssize_t cswrite(const char * ptr, size_t size, size_t count, CODE * fp) {
+	ssize_t brw;
 	size *= count;
-	if (size + stream->curoff >= stream->maxsize) {
-		size = stream->maxsize - stream->curoff;
+
+	brw = fs_write(fp, (char *)ptr, size);
+	if (brw < 0) {
+		printk("Failed writing to file [%d]\n", brw);
+		fs_close(fp);
+		return 0;
 	}
 
-	char *pos = &stream->data[stream->curoff];
-	for (t = 0; t < size; t++) {
-		*(pos++) = *ptr++;
-	}
-
-	stream->curoff += size;
-	if (stream->curend < stream->curoff)
-		stream->curend = stream->curoff;
-
-	return size;
+	return brw;
 }
 
-size_t csread(char * ptr, size_t size, size_t count, CODE * stream) {
-	size_t t = 0;
-
-	count *= size;
-	while (count-- > 0 && stream->curoff < stream->curend) {
-		ptr[t++] = stream->data[stream->curoff++];
+ssize_t csread(char * ptr, size_t size, size_t count, CODE * fp) {
+	ssize_t brw = fs_read(fp, ptr, size);
+	if (brw < 0) {
+		printk("Failed reading file [%d]\n", brw);
+		fs_close(fp);
+		return -1;
 	}
-
-	return t;
+	return brw;
 }
 
 void csdescribe(CODE * stream) {
-	printk("File   [%s]\n", stream->filename);
-	printk("Cursor [%u]\n", stream->curoff);
-	printk("Size   [%u]\n", stream->curend);
-	if (stream->maxsize != MAX_JAVASCRIPT_CODE_LEN)
-		printk("MaxSize[%u]\n", stream->maxsize);
+	printk("[DESCRIBE]\n");
 }
 
-int csclose(CODE * stream) {
+int csclose(CODE * fp) {
 	printk("[CLOSE FILE]\n");
-	csdescribe(stream);
-	return (EOF);
+	int res = fs_close(fp);
+	free(fp);
+	return res;
 }
 
 #ifdef CONFIG_CODE_MEMORY_TESTING

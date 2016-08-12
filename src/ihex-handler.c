@@ -67,6 +67,10 @@
  */
 static CODE *code_memory = NULL;
 
+#ifdef CONFIG_USE_FILESYSTEM
+ZFILE fp;
+#endif
+
 /****************************** IHEX ****************************************/
 
 static bool marker = false;
@@ -128,6 +132,16 @@ uint32_t ihex_process_init() {
 	acm_println("[READY]");
 
 	ihex_begin_read(&ihex);
+
+	int res;
+	char read_buff[80];
+
+#ifdef CONFIG_USE_FILESYSTEM
+	res = open_file(&fp, ashell_get_filename());
+	if (res) {
+		return;
+	}
+#endif
 
 	code_memory = csopen("test.js", "w+");
 

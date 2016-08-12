@@ -102,6 +102,23 @@ const char eval_prompt[] = ANSI_FG_GREEN "js> " ANSI_FG_RESTORE;
 #define DBG printk
 #endif /* CONFIG_IHEX_UPLOADER_DEBUG */
 
+#define CONFIG_USE_FILESYSTEM
+
+#ifdef CONFIG_USE_FILESYSTEM
+#include <fs/fs_interface.h>
+#include <ff.h>
+#include <fs/fat_fs.h>
+#include <fs.h>
+#endif
+
+#ifdef CONFIG_USE_FILESYSTEM
+ZFILE *fp;
+#endif
+
+const char *ashell_get_filename() {
+	return shell.filename;
+}
+
 int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 	char data[READ_BUFFER_SIZE];
 	const char *filename;
@@ -129,7 +146,9 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 		return RET_ERROR;
 	}
 
-	if (file->curend == 0) {
+	fs_seek(fp, 0, SEEK_END);
+	off_t file_len = fs_tell(file);
+	if (file_len == 0) {
 		acm_println("Empty file");
 		csclose(file);
 		return RET_ERROR;
@@ -182,7 +201,10 @@ int32_t ashell_list_directory_contents(const char *buf, uint32_t len, char *arg)
 	}
 
 	CODE *file = csopen(arg, "r");
-	printf("%5d %s\n", file->curend, arg);
+	fs_seek(fp, 0, SEEK_END);
+	off_t file_len = fs_tell(file);
+
+	printf("%5d %s\n", file_len, arg);
 	csclose(file);
 	return RET_OK;
 }
