@@ -160,7 +160,7 @@ int32_t ashell_list_dir(const char *buf, uint32_t len, char *arg) {
 		else {
 			char *p = entry.name;
 			for (; *p; ++p)
-				*p = tolower(*p);
+				*p = tolower((int) *p);
 
 			printf("%5lu %s\n",
 				entry.size, entry.name);
@@ -379,8 +379,6 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 		} else {
 			size_t written = cswrite(&byte, 1, 1, code_memory);
 			if (written == 0) {
-				printf("Failed writting into file \n");
-				csdescribe(code_memory);
 				return RET_ERROR;
 			}
 			printf("%c", byte);

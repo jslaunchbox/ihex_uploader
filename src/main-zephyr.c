@@ -62,11 +62,6 @@ static int shell_cmd_verbose(int argc, char *argv[]) {
 	return 0;
 }
 
-static int shell_cmd_syntax_help(int argc, char *argv[]) {
-	printf("version jerryscript & zephyr versions\n");
-	return 0;
-}
-
 static int shell_cmd_version(int argc, char *argv[]) {
 	uint32_t version = sys_kernel_version_get();
 
@@ -78,6 +73,7 @@ static int shell_cmd_version(int argc, char *argv[]) {
 	return 0;
 }
 
+/* Debug commands to diagnose problems in the ACM shell */
 static int shell_acm_command(int argc, char *argv[]) {
 	if (argc <= 1)
 		return -1;
@@ -194,12 +190,10 @@ static int shell_cmd_handler(int argc, char *argv[]) {
 const struct shell_cmd commands[] =
 {
   SHELL_COMMAND("clear", shell_clear_command),
-  SHELL_COMMAND("syntax", shell_cmd_syntax_help),
   SHELL_COMMAND("version", shell_cmd_version),
   SHELL_COMMAND("test", shell_cmd_test),
   SHELL_COMMAND("acm", shell_acm_command),
   SHELL_COMMAND("verbose", shell_cmd_verbose),
-
   SHELL_COMMAND(NULL, NULL)
 };
 #endif
@@ -208,7 +202,7 @@ void main(void) {
 #ifdef CONFIG_USE_JS_SHELL
 	jerry_init(JERRY_INIT_EMPTY);
 	shell_clear_command(0, 0);
-	printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
+	shell_cmd_version(0, NULL);
 	shell_register_app_cmd_handler(shell_cmd_handler);
 	shell_init(system_get_prompt(), commands);
 	/* Don't call jerry_cleanup() here, as shell_init() returns after setting

@@ -69,7 +69,16 @@
 
 extern void __stdout_hook_install(int(*fn)(int));
 
-const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
+static const char banner[] =
+"ZephyrJerry\r\n" __DATE__ " " __TIME__ "\r\n" \
+"    ____\r\n"\
+"  ,'   Y`.\r\n"\
+" /        \\\r\n"\
+" \\ ()  () /\r\n"\
+"  `. /\\ ,'\r\n"\
+"8===|\"\"|===8\r\n"\
+"    `LL'\r\n";
+
 const char filename[] = "jerry.js";
 
 // Jerryscript in green color
