@@ -23,34 +23,18 @@
 
 /* Zephyr includes */
 #include <zephyr.h>
-
+#include <malloc.h>
 #include <string.h>
 
 /* JerryScript includes */
 #include "jerry-api.h"
 
+#include "uart-uploader.h"
 #include "code-memory.h"
-#include "acm-shell.h"
-
-extern void __stdout_hook_install(int(*fn)(int));
-
-/**
-*
-* @brief Output one character to UART ACM
-*
-* @param c Character to output
-* @return The character passed as input.
-*/
-
-static int acm_out(int c) {
-	acm_writec((char) c);
-	return 1;
-}
 
 void javascript_eval_code(const char *source_buffer) {
 	jerry_value_t ret_val;
 
-	__stdout_hook_install(acm_out);
 	ret_val = jerry_eval((jerry_char_t *)source_buffer,
 		strlen(source_buffer),
 		false);
@@ -69,11 +53,14 @@ void javascript_run_code(const char *file_name) {
 
 	fs_seek(fp, 0, SEEK_END);
 	off_t len = fs_tell(fp);
-	if (len == 0)
+	if (len == 0) {
+		printf("Empty file\n");
 		return;
+	}
 
 	char *buf = (char *) malloc(len);
 
+	fs_seek(fp, 0, SEEK_SET);
 	ssize_t brw = fs_read(fp, buf, len);
 	if (brw < 0) {
 		fs_close(fp);
@@ -86,8 +73,6 @@ void javascript_run_code(const char *file_name) {
 	free(buf);
 
 	if (!jerry_value_has_error_flag(parsed_code)) {
-		__stdout_hook_install(acm_out);
-
 		/* Execute the parsed source code in the Global scope */
 		jerry_value_t ret_value = jerry_run(parsed_code);
 

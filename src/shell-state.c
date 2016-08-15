@@ -53,6 +53,7 @@
 #define CMD_LOAD           "load"
 #define CMD_CAT            "cat"
 #define CMD_EVAL           "eval"
+#define CMD_DU             "du"
 
 /*
  * Contains the pointer to the memory where the code will be uploaded
@@ -138,6 +139,12 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 		filename = arg;
 	}
 
+	if (!csexist(filename)) {
+		printf(ERROR_FILE_NOT_FOUND);
+		return RET_ERROR;
+	}
+
+	printk("Open [%s]\n", filename);
 	file = csopen(filename, "r");
 
 	// Error getting an id for our data storage
@@ -146,19 +153,19 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 		return RET_ERROR;
 	}
 
-	fs_seek(fp, 0, SEEK_END);
-	off_t file_len = fs_tell(file);
-	if (file_len == 0) {
+	ssize_t size = cssize(file);
+	if (size == 0) {
 		acm_println("Empty file");
 		csclose(file);
-		return RET_ERROR;
+		return RET_OK;
 	}
 
 	csseek(file, 0, SEEK_SET);
 	do {
+		printk("%u\n", fs_tell(file));
 		count = csread(data, 4, 1, file);
 		for (int t = 0; t < count; t++) {
-			if (data[t] == '\n')
+			if (data[t] == '\n' || data[t] == '\r')
 				acm_write("\r\n", 2);
 			else
 				acm_writec(data[t]);
@@ -166,7 +173,6 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 	} while (count > 0);
 
 	csclose(file);
-	acm_println("");
 	return RET_OK;
 }
 
@@ -191,6 +197,35 @@ int32_t ashell_run_javascript(const char *buf, uint32_t len) {
 	return RET_OK;
 }
 
+int32_t ashell_disk_usage(const char *buf, uint32_t len, char *arg) {
+	const char *filename;
+	uint32_t arg_len;
+
+	if (len > MAX_FILENAME_SIZE) {
+		acm_println(ERROR_EXCEDEED_SIZE);
+		return RET_ERROR;
+	}
+
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_FILENAME_SIZE, &arg_len);
+	if (arg_len == 0) {
+		filename = shell.filename;
+	} else {
+		filename = arg;
+	}
+
+	CODE *file = csopen(arg, "r");
+	if (file == NULL) {
+		acm_println(ERROR_FILE_NOT_FOUND);
+		return RET_ERROR;
+	}
+
+	ssize_t size = cssize(file);
+	csclose(file);
+
+	printf("%5ld %s\n", size, filename);
+	return RET_OK;
+}
+
 int32_t ashell_list_directory_contents(const char *buf, uint32_t len, char *arg) {
 	uint32_t arg_len;
 
@@ -201,10 +236,10 @@ int32_t ashell_list_directory_contents(const char *buf, uint32_t len, char *arg)
 	}
 
 	CODE *file = csopen(arg, "r");
-	fs_seek(fp, 0, SEEK_END);
+	fs_seek(file, 0, SEEK_END);
 	off_t file_len = fs_tell(file);
 
-	printf("%5d %s\n", file_len, arg);
+	printf("%5ld %s\n", file_len, arg);
 	csclose(file);
 	return RET_OK;
 }
@@ -281,6 +316,8 @@ int32_t ashell_eval_javascript(const char *buf, uint32_t len) {
 }
 
 int32_t ashell_raw_capture(const char *buf, uint32_t len) {
+	uint8_t eol = '\n';
+
 	while (len > 0) {
 		uint8_t byte = *buf++;
 		if (!isprint(byte)) {
@@ -289,7 +326,9 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 					acm_println(MSG_FILE_SAVED);
 					shell.state_flags &= ~kShellCaptureRaw;
 					acm_set_prompt(NULL);
+					cswrite(&eol, 1, 1, code_memory);
 					ashell_close_capture();
+					return RET_OK;
 					break;
 				case ASCII_END_OF_TEXT:
 				case ASCII_CANCEL:
@@ -317,7 +356,6 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 		len--;
 	}
 
-	uint8_t eol = '\n';
 	cswrite(&eol, 1, 1, code_memory);
 	return 0;
 }
@@ -515,6 +553,10 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 
 	if (!strcmp(CMD_EVAL, arg)) {
 		return ashell_js_immediate_mode(buf, len);
+	}
+
+	if (!strcmp(CMD_DU, arg)) {
+		return ashell_disk_usage(buf, len, arg);
 	}
 
 #ifdef CONFIG_SHELL_UPLOADER_DEBUG

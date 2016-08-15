@@ -18,7 +18,7 @@
 
 #define MAX_JAVASCRIPT_CODE_LEN 4096
 
-#define MAX_FILENAME_SIZE 16
+#define MAX_FILENAME_SIZE 13
 
 #include <fs/fs_interface.h>
 #include <ff.h>
@@ -33,5 +33,6 @@ ssize_t cswrite(const char *ptr, size_t size, size_t count, CODE *stream);
 ssize_t csread(char *ptr, size_t size, size_t count, CODE *stream);
 int csclose(CODE * stream);
 void csdescribe(CODE * stream);
+ssize_t cssize(CODE *file);
 
 #endif

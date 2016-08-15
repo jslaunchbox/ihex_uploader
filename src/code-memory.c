@@ -34,11 +34,10 @@
 #include <init.h>
 
 #include <misc/printk.h>
-
+#include <malloc.h>
 #include "code-memory.h"
 
-int csexist(const char *path)
-{
+int csexist(const char *path) {
 	int res;
 	struct zfs_dirent entry;
 	res = fs_stat(path, &entry);
@@ -46,19 +45,17 @@ int csexist(const char *path)
 }
 
 CODE *csopen(const char * filename, const char * mode) {
-	printk("[OPEN FILE]\n");
-	struct zfs_dirent entry;
+	printk("[OPEN FILE] %s\n",filename);
 	int res;
 
 	/* Delete file if exists */
 	if (mode[0] == 'w') {
-		res = fs_stat(filename, &entry);
-		if (res) {
+		if (csexist(filename)) {
 			/* Delete the file and verify checking its status */
 			res = fs_unlink(filename);
 			if (res) {
 				printk("Error deleting file [%d]\n", res);
-				return res;
+				return NULL;
 			}
 		}
 	}
@@ -73,7 +70,7 @@ CODE *csopen(const char * filename, const char * mode) {
 }
 
 int csseek(CODE *fp, long int offset, int whence) {
-	int res = fs_seek(fp, offset, SEEK_SET);
+	int res = fs_seek(fp, offset, whence);
 	if (res) {
 		printk("fs_seek failed [%d]\n", res);
 		fs_close(fp);
@@ -83,15 +80,26 @@ int csseek(CODE *fp, long int offset, int whence) {
 	return 0;
 }
 
+ssize_t cssize(CODE *file) {
+	if (csseek(file, 0, SEEK_END)!=0)
+		return -1;
+
+	off_t file_len = fs_tell(file);
+	return file_len;
+}
+
 ssize_t cswrite(const char * ptr, size_t size, size_t count, CODE * fp) {
 	ssize_t brw;
 	size *= count;
 
-	brw = fs_write(fp, (char *)ptr, size);
+	brw = fs_write(fp, (const char *) ptr, size);
 	if (brw < 0) {
 		printk("Failed writing to file [%d]\n", brw);
 		fs_close(fp);
 		return 0;
+	}
+	else {
+		printk("Saved [%d]\n", brw);
 	}
 
 	return brw;
