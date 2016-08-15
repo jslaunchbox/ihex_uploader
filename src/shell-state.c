@@ -120,6 +120,57 @@ const char *ashell_get_filename() {
 	return shell.filename;
 }
 
+int32_t ashell_list_dir(const char *buf, uint32_t len, char *arg) {
+	int res;
+	ZDIR dp;
+	static struct zfs_dirent entry;
+
+	const char *filename;
+	uint32_t arg_len;
+
+	if (len > MAX_FILENAME_SIZE) {
+		acm_println(ERROR_EXCEDEED_SIZE);
+		return RET_ERROR;
+	}
+
+	buf = ashell_get_next_arg_s(buf, len, arg, MAX_FILENAME_SIZE, &arg_len);
+	if (arg_len == 0) {
+		filename = "";
+	} else {
+		filename = arg;
+	}
+
+	res = fs_opendir(&dp, filename);
+	if (res) {
+		printf("Error opening dir[%d]\n", res);
+		return res;
+	}
+
+	printf(ANSI_FG_LIGHT_BLUE "      .\n      ..\n" ANSI_FG_RESTORE);
+	for (;;) {
+		res = fs_readdir(&dp, &entry);
+
+		/* entry.name[0] == 0 means end-of-dir */
+		if (res || entry.name[0] == 0) {
+			break;
+		}
+		if (entry.type == DIR_ENTRY_DIR) {
+			printf(ANSI_FG_LIGHT_BLUE "%s\n" ANSI_FG_RESTORE, entry.name);
+		}
+		else {
+			char *p = entry.name;
+			for (; *p; ++p)
+				*p = tolower(*p);
+
+			printf("%5lu %s\n",
+				entry.size, entry.name);
+		}
+	}
+
+	fs_closedir(&dp);
+	return 0;
+}
+
 int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 	char data[READ_BUFFER_SIZE];
 	const char *filename;
@@ -162,7 +213,6 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 
 	csseek(file, 0, SEEK_SET);
 	do {
-		printk("%u\n", fs_tell(file));
 		count = csread(data, 4, 1, file);
 		for (int t = 0; t < count; t++) {
 			if (data[t] == '\n' || data[t] == '\r')
@@ -223,24 +273,6 @@ int32_t ashell_disk_usage(const char *buf, uint32_t len, char *arg) {
 	csclose(file);
 
 	printf("%5ld %s\n", size, filename);
-	return RET_OK;
-}
-
-int32_t ashell_list_directory_contents(const char *buf, uint32_t len, char *arg) {
-	uint32_t arg_len;
-
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
-	if (arg_len == 0) {
-		acm_println("TODO: Not implemented");
-		return RET_OK;
-	}
-
-	CODE *file = csopen(arg, "r");
-	fs_seek(file, 0, SEEK_END);
-	off_t file_len = fs_tell(file);
-
-	printf("%5ld %s\n", file_len, arg);
-	csclose(file);
 	return RET_OK;
 }
 
@@ -521,7 +553,6 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	}
 
 	if (!strcmp(CMD_AT, arg)) {
-		printf("AT OK\r\n");
 		acm_println("OK");
 		return RET_OK;
 	}
@@ -548,7 +579,7 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	}
 
 	if (!strcmp(CMD_LS, arg)) {
-		return ashell_list_directory_contents(buf, len, arg);
+		return ashell_list_dir(buf, len, arg);
 	}
 
 	if (!strcmp(CMD_EVAL, arg)) {

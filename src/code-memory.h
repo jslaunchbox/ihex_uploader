@@ -28,11 +28,11 @@
 #define CODE ZFILE
 
 CODE *csopen(const char *filename, const char *mode);
+int csexist(const char *path);
 int csseek(CODE *stream, long int offset, int whence);
 ssize_t cswrite(const char *ptr, size_t size, size_t count, CODE *stream);
 ssize_t csread(char *ptr, size_t size, size_t count, CODE *stream);
 int csclose(CODE * stream);
-void csdescribe(CODE * stream);
 ssize_t cssize(CODE *file);
 
 #endif

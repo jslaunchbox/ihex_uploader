@@ -45,7 +45,7 @@ int csexist(const char *path) {
 }
 
 CODE *csopen(const char * filename, const char * mode) {
-	printk("[OPEN FILE] %s\n",filename);
+	printk("[OPEN] %s\n",filename);
 	int res;
 
 	/* Delete file if exists */
@@ -115,12 +115,8 @@ ssize_t csread(char * ptr, size_t size, size_t count, CODE * fp) {
 	return brw;
 }
 
-void csdescribe(CODE * stream) {
-	printk("[DESCRIBE]\n");
-}
-
 int csclose(CODE * fp) {
-	printk("[CLOSE FILE]\n");
+	printk("[CLOSE]\n");
 	int res = fs_close(fp);
 	free(fp);
 	return res;
