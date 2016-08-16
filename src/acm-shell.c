@@ -277,7 +277,7 @@ const char *ashell_get_next_arg(const char *str, uint32_t nsize, char *str_arg, 
 	return str;
 }
 
-/** @brief Safe function to copy the next argument into the string
+/** @brief Safe function to copy the next argument into a destination argument string
 *
 * @param str          Null terminated string
 * @param nsize        Checks line size boundaries.
@@ -295,6 +295,58 @@ const char *ashell_get_next_arg_s(const char *str, uint32_t nsize, char *str_arg
 	}
 
 	return ashell_get_next_arg(str, nsize, str_arg, length);
+}
+
+/**
+ * @brief Skips all the spaces until it finds the first character
+ *
+ * @param str   Null terminated string
+ * @return 0	Returns NULL at the end of the string
+ */
+
+char *ashell_skip_spaces(char *str) {
+	if (str == NULL || *str == '\0') {
+		return NULL;
+	}
+
+	/* Skip initial spaces if any */
+	while (*str == ' ') {
+		str++;
+		if (*str == '\0') {
+			return NULL;
+		}
+	}
+	return str;
+}
+
+/**
+ * @brief Returns the next token in the string
+ *        It modifies the string, so it is destructive.
+ *
+ * @param str   Null terminated string
+ * @return 0	Returns NULL at the end of the string
+ */
+
+char *ashell_get_token_arg(char *str) {
+	str = ashell_skip_spaces(str);
+	if (str == NULL)
+		return NULL;
+
+	/* Skip until we find a space of end of line */
+	while (*str != 0 && *str != ' ') {
+		str++;
+	}
+
+	/* Reached end of string, no more tokens */
+	if (*str == '\0') {
+		return NULL;
+	}
+
+	/* Terminate current token */
+	*str++ = '\0';
+
+	/* Skip spaces to search for new token if any */
+	return ashell_skip_spaces(str);
 }
 
 uint32_t ashell_process_init() {
@@ -492,31 +544,40 @@ struct shell_tests {
 	uint32_t result;
 };
 
-#define TEST_PARAMS(str, size, res) { str, size, res }
+#define TEST_PARAMS(str,size, params) { str, size, params }
 
-const struct shell_tests test[] =
+struct shell_tests test[] =
 {
-	/* Buffer overflow */
-	TEST_PARAMS("12345678901234567890123456789012345678901234567890123456789012345678901234567890", 32, 1),
-	TEST_PARAMS("test1 ( )", 10, 3),
-	TEST_PARAMS("hello world", 12, 2),
-	TEST_PARAMS("h  w", 5, 2),
-	TEST_PARAMS("hello", 6, 1),
-	/* Cut the string */
-	TEST_PARAMS("test2 ( ) ", 8, 2),
-	TEST_PARAMS("test3 ", 7, 1),
-	TEST_PARAMS(" test4", 7, 1),
-	TEST_PARAMS("test5 ( ) ", sizeof("test5 ( ) "), 3),
 	TEST_PARAMS(" ", 2, 0),
 	TEST_PARAMS("     ", 6, 0),
 	/* Wrong string length */
 	TEST_PARAMS(" ", 0, 0),
+	TEST_PARAMS("hello world", 12, 2),
+	TEST_PARAMS("hello", 6, 1),
+
+	TEST_PARAMS("test1 ( )", 10, 3),
+	TEST_PARAMS("test2 ( ) ", 8, 2),
+	TEST_PARAMS("test3 (    )     ", sizeof("test2 (    )     "), 3),
+	TEST_PARAMS(" test4", 7, 1),
+	TEST_PARAMS("test5 ( ) ", sizeof("test5 ( ) "), 3),
+	TEST_PARAMS("test6 ( ) ", 11, 3),
+	TEST_PARAMS("test7 ", 7, 1),
+	TEST_PARAMS("h  w", 5, 2),
+
+	/* Buffer overflow */
+	TEST_PARAMS("12345678901234567890123456789012345678901234567890123456789012345678901234567890", 32, 1),
+	/* Cut the string */
+	TEST_PARAMS(" test8 ", 8, 1),
 	TEST_PARAMS(NULL, 0, 0)
 };
+
 
 void shell_unit_test() {
 	uint32_t t = 0;
 	uint32_t argc;
+	char tmp[512];
+	char *buf;
+	char *next;
 
 	while (t != sizeof(test) / sizeof(shell_tests)) {
 		argc = ashell_get_argc(test[t].str, test[t].size);
@@ -549,6 +610,36 @@ void shell_unit_test() {
 		t++;
 	}
 
+	/* Destructive case, since get token will zero terminate the string */
+	while (t != sizeof(test) / sizeof(shell_tests)) {
+		if (test[t].str != NULL) {
+			strncpy_s(tmp, test[t].str, sizeof(tmp));
+			buf = tmp;
+			argc = 0;
+
+			printf("------------------------- \n");
+			while (buf != NULL) {
+				buf[test[t].size] = '\0';
+				buf = ashell_skip_spaces(buf);
+				if (buf == NULL) {
+					next = NULL;
+					printf("No arguments \n");
+				}
+				else {
+					next = ashell_get_token_arg(buf);
+					argc++;
+					printf(" %d [%s]\n", argc, buf);
+				}
+
+				buf = next;
+			}
+
+			if (argc != test[t].result) {
+				printf(" Failed test %d\n", t);
+			}
+		}
+		t++;
+	}
 	printf("All tests were successful \n");
 }
 #endif

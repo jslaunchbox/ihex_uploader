@@ -120,24 +120,28 @@ const char *ashell_get_filename() {
 	return shell.filename;
 }
 
-int32_t ashell_list_dir(const char *buf, uint32_t len, char *arg) {
+uint32_t ashell_get_filename_buffer(const char *buf, char *destination) {
+	uint32_t arg_len = 0;
+	uint32_t len = strlen(buf);
+	if (len == 0)
+		return RET_ERROR;
+
+	buf = ashell_get_next_arg_s(buf, len, destination, MAX_FILENAME_SIZE, &arg_len);
+
+	if (arg_len == 0) {
+		strcpy(destination, shell.filename);
+	}
+	return arg_len;
+}
+
+int32_t ashell_list_dir(const char *buf) {
 	int res;
 	ZDIR dp;
 	static struct zfs_dirent entry;
 
-	const char *filename;
-	uint32_t arg_len;
-
-	if (len > MAX_FILENAME_SIZE) {
-		acm_println(ERROR_EXCEDEED_SIZE);
+	char filename[MAX_FILENAME_SIZE];
+	if (ashell_get_filename_buffer(buf, filename) <= 0) {
 		return RET_ERROR;
-	}
-
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_FILENAME_SIZE, &arg_len);
-	if (arg_len == 0) {
-		filename = "";
-	} else {
-		filename = arg;
 	}
 
 	res = fs_opendir(&dp, filename);
@@ -171,23 +175,14 @@ int32_t ashell_list_dir(const char *buf, uint32_t len, char *arg) {
 	return 0;
 }
 
-int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
+int32_t ashell_print_file(const char *buf) {
+	char filename[MAX_FILENAME_SIZE];
 	char data[READ_BUFFER_SIZE];
-	const char *filename;
 	CODE *file;
-	uint32_t arg_len;
 	size_t count;
 
-	if (len > MAX_FILENAME_SIZE) {
-		acm_println(ERROR_EXCEDEED_SIZE);
+	if (ashell_get_filename_buffer(buf, filename) <= 0) {
 		return RET_ERROR;
-	}
-
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_FILENAME_SIZE, &arg_len);
-	if (arg_len == 0) {
-		filename = shell.filename;
-	} else {
-		filename = arg;
 	}
 
 	if (!csexist(filename)) {
@@ -226,20 +221,10 @@ int32_t ashell_print_file(const char *buf, uint32_t len, char *arg) {
 	return RET_OK;
 }
 
-int32_t ashell_run_javascript(const char *buf, uint32_t len) {
+int32_t ashell_run_javascript(char *buf) {
 	char filename[MAX_FILENAME_SIZE];
-	uint32_t arg_len;
-
-	if (len > MAX_FILENAME_SIZE) {
-		acm_println(ERROR_EXCEDEED_SIZE);
+	if (ashell_get_filename_buffer(buf, filename) <= 0) {
 		return RET_ERROR;
-	}
-
-	buf = ashell_get_next_arg_s(buf, len, filename, MAX_FILENAME_SIZE, &arg_len);
-	if (arg_len == 0) {
-		printk("[RUN][%s]\r\n", shell.filename);
-		javascript_run_code(shell.filename);
-		return RET_OK;
 	}
 
 	printk("[RUN][%s]\r\n", filename);
@@ -247,23 +232,13 @@ int32_t ashell_run_javascript(const char *buf, uint32_t len) {
 	return RET_OK;
 }
 
-int32_t ashell_disk_usage(const char *buf, uint32_t len, char *arg) {
-	const char *filename;
-	uint32_t arg_len;
-
-	if (len > MAX_FILENAME_SIZE) {
-		acm_println(ERROR_EXCEDEED_SIZE);
+int32_t ashell_disk_usage(char *buf) {
+	char filename[MAX_FILENAME_SIZE];
+	if (ashell_get_filename_buffer(buf, filename) <= 0) {
 		return RET_ERROR;
 	}
 
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_FILENAME_SIZE, &arg_len);
-	if (arg_len == 0) {
-		filename = shell.filename;
-	} else {
-		filename = arg;
-	}
-
-	CODE *file = csopen(arg, "r");
+	CODE *file = csopen(filename, "r");
 	if (file == NULL) {
 		acm_println(ERROR_FILE_NOT_FOUND);
 		return RET_ERROR;
@@ -276,22 +251,14 @@ int32_t ashell_disk_usage(const char *buf, uint32_t len, char *arg) {
 	return RET_OK;
 }
 
-int32_t ashell_help(const char *buf, uint32_t len) {
+int32_t ashell_help(const char *buf) {
 	acm_println("TODO: Read help file!");
 	return RET_OK;
 }
 
-int32_t ashell_set_filename(const char *buf, uint32_t len) {
-	uint32_t arg_len;
-
-	if (len > MAX_FILENAME_SIZE) {
-		acm_println(ERROR_EXCEDEED_SIZE);
-		return RET_ERROR;
-	}
-
-	buf = ashell_get_next_arg_s(buf, len, shell.filename, MAX_FILENAME_SIZE, &arg_len);
-	if (arg_len == 0) {
-		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
+int32_t ashell_set_filename(char *buf) {
+	if (ashell_get_filename_buffer(buf, shell.filename) <= 0) {
+		acm_print(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return RET_ERROR;
 	}
 
@@ -390,7 +357,7 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 	return 0;
 }
 
-int32_t ashell_read_data(const char *buf, uint32_t len, char *arg) {
+int32_t ashell_read_data(char *buf) {
 	if (shell.state_flags & kShellTransferRaw) {
 		acm_println(ANSI_CLEAR);
 		acm_println(READY_FOR_RAW_DATA);
@@ -406,7 +373,7 @@ int32_t ashell_read_data(const char *buf, uint32_t len, char *arg) {
 	return RET_OK;
 }
 
-int32_t ashell_js_immediate_mode(const char *buf, uint32_t len) {
+int32_t ashell_js_immediate_mode(char *buf) {
 	shell.state_flags |= kShellEvalJavascript;
 	acm_print(ANSI_CLEAR);
 	acm_println(MSG_IMMEDIATE_MODE);
@@ -414,27 +381,25 @@ int32_t ashell_js_immediate_mode(const char *buf, uint32_t len) {
 	return 0;
 }
 
-int32_t ashell_set_transfer_state(const char *buf, uint32_t len, char *arg) {
-	uint32_t arg_len;
-
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
-	if (arg_len == 0) {
+int32_t ashell_set_transfer_state(char *buf) {
+	char *next;
+	if (buf == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return -1;
 	}
-	len -= arg_len;
+	next = ashell_get_token_arg(buf);
 
-	printf(" Arg [%s]::%d \n", arg, (int)arg_len);
-	acm_println(arg);
+	printf(" Arg [%s]\n", buf);
+	acm_println(buf);
 
-	if (!strcmp(CMD_TRANSFER_RAW, arg)) {
+	if (!strcmp(CMD_TRANSFER_RAW, buf)) {
 		acm_set_prompt(NULL);
 		shell.state_flags |= kShellTransferRaw;
 		shell.state_flags &= ~kShellTransferIhex;
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_TRANSFER_IHEX, arg)) {
+	if (!strcmp(CMD_TRANSFER_IHEX, buf)) {
 		acm_set_prompt(hex_prompt);
 		shell.state_flags |= kShellTransferIhex;
 		shell.state_flags &= ~kShellTransferRaw;
@@ -444,37 +409,35 @@ int32_t ashell_set_transfer_state(const char *buf, uint32_t len, char *arg) {
 	return RET_UNKNOWN;
 }
 
-int32_t ashell_set_state(const char *buf, uint32_t len, char *arg) {
-	uint32_t arg_len;
-
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
-	if (arg_len == 0) {
+int32_t ashell_set_state(char *buf) {
+	char *next;
+	if (buf == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return -1;
 	}
-	len -= arg_len;
+	next = ashell_get_token_arg(buf);
 
-	if (!strcmp(CMD_TRANSFER, arg)) {
-		return ashell_set_transfer_state(buf, len, arg);
+	if (!strcmp(CMD_TRANSFER, buf)) {
+		return ashell_set_transfer_state(next);
 	} else
-		if (!strcmp(CMD_FILENAME, arg)) {
-			return ashell_set_filename(buf, len);
+		if (!strcmp(CMD_FILENAME, buf)) {
+			return ashell_set_filename(next);
 		}
 
 	return RET_UNKNOWN;
 }
 
-int32_t ashell_get_state(const char *buf, uint32_t len, char *arg) {
-	uint32_t arg_len;
+int32_t ashell_get_state(char *buf) {
+	char *next;
 
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
-	if (arg_len == 0) {
+	if (buf == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
 		return -1;
 	}
-	len -= arg_len;
 
-	if (!strcmp(CMD_TRANSFER, arg)) {
+	next = ashell_get_token_arg(buf);
+
+	if (!strcmp(CMD_TRANSFER, buf)) {
 		printf("Flags %lu\n", shell.state_flags);
 
 		if (shell.state_flags & kShellTransferRaw)
@@ -486,7 +449,7 @@ int32_t ashell_get_state(const char *buf, uint32_t len, char *arg) {
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_FILENAME, arg)) {
+	if (!strcmp(CMD_FILENAME, buf)) {
 		acm_println(shell.filename);
 		return RET_OK;
 	}
@@ -509,9 +472,9 @@ int32_t ashell_check_control(const char *buf, uint32_t len) {
 	return 0;
 }
 
-int32_t ashell_main_state(const char *buf, uint32_t len) {
-	char arg[MAX_ARGUMENT_SIZE];
-	uint32_t argc, arg_len = 0;
+int32_t ashell_main_state(char *buf, uint32_t len) {
+	char *next;
+	uint32_t argc;
 
 	if (shell.state_flags & kShellEvalJavascript) {
 		return ashell_eval_javascript(buf, len);
@@ -533,69 +496,63 @@ int32_t ashell_main_state(const char *buf, uint32_t len) {
 	if (argc == 0)
 		return 0;
 
-	buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
-	len -= arg_len;
-	argc--;
+	buf[len] = '\0';
+	buf = ashell_skip_spaces(buf);
+	if (buf == NULL)
+		return 0;
 
-	if (!strcmp(CMD_SET, arg)) {
-		return ashell_set_state(buf, len, arg);
+	next = ashell_get_token_arg(buf);
+
+	if (!strcmp(CMD_SET, buf)) {
+		return ashell_set_state(next);
 	}
 
-	if (!strcmp(CMD_GET, arg)) {
-		return ashell_get_state(buf, len, arg);
+	if (!strcmp(CMD_GET, buf)) {
+		return ashell_get_state(next);
 	}
 
-	if (!strcmp(CMD_TEST, arg)) {
+	if (!strcmp(CMD_TEST, buf)) {
 		acm_println("Hi world");
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_AT, arg)) {
+	if (!strcmp(CMD_AT, buf)) {
 		acm_println("OK");
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_CLEAR, arg)) {
+	if (!strcmp(CMD_CLEAR, buf)) {
 		acm_print(ANSI_CLEAR);
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_LOAD, arg)) {
-		return ashell_read_data(buf, len, arg);
+	if (!strcmp(CMD_LOAD, buf)) {
+		return ashell_read_data(next);
 	}
 
-	if (!strcmp(CMD_HELP, arg)) {
-		return ashell_help(buf, len);
+	if (!strcmp(CMD_HELP, buf)) {
+		return ashell_help(next);
 	}
 
-	if (!strcmp(CMD_RUN, arg)) {
-		return ashell_run_javascript(buf, len);
+	if (!strcmp(CMD_RUN, buf)) {
+		return ashell_run_javascript(next);
 	}
 
-	if (!strcmp(CMD_CAT, arg)) {
-		return ashell_print_file(buf, len, arg);
+	if (!strcmp(CMD_CAT, buf)) {
+		return ashell_print_file(next);
 	}
 
-	if (!strcmp(CMD_LS, arg)) {
-		return ashell_list_dir(buf, len, arg);
+	if (!strcmp(CMD_LS, buf)) {
+		return ashell_list_dir(next);
 	}
 
-	if (!strcmp(CMD_EVAL, arg)) {
-		return ashell_js_immediate_mode(buf, len);
+	if (!strcmp(CMD_EVAL, buf)) {
+		return ashell_js_immediate_mode(next);
 	}
 
-	if (!strcmp(CMD_DU, arg)) {
-		return ashell_disk_usage(buf, len, arg);
+	if (!strcmp(CMD_DU, buf)) {
+		return ashell_disk_usage(next);
 	}
 
-#ifdef CONFIG_SHELL_UPLOADER_DEBUG
-	printk("%u [%s] \r\n", arg_len, arg);
-
-	for (int t = 0; t < argc; t++) {
-		buf = ashell_get_next_arg_s(buf, len, arg, MAX_ARGUMENT_SIZE, &arg_len);
-		len -= arg_len;
-		printf(" Arg [%s]::%d \n", arg, (int)arg_len);
-	}
-#endif
 	return RET_UNKNOWN;
 }

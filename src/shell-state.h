@@ -36,7 +36,7 @@ struct shell_state_config {
 	uint32_t state_flags;
 };
 
-int32_t ashell_main_state(const char *buf, uint32_t len);
+int32_t ashell_main_state(char *buf, uint32_t len);
 const char *ashell_get_filename();
 
 #endif
