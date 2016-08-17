@@ -54,12 +54,16 @@
  * https://telepathy.freedesktop.org/doc/telepathy-glib/telepathy-glib-debug-ansi.html
  */
 
-#define ANSI_FG_BLUE    "\x1b[34m"
-#define ANSI_FG_YELLOW  "\x1b[33m"
-#define ANSI_FG_GREEN   "\x1b[32m"
-#define ANSI_FG_RED     "\x1b[31m"
-#define ANSI_FG_RESTORE "\x1b[39m"
-#define ANSI_CLEAR      "\x1b[2J\x1b[H"
+#define ANSI_FG_RED        "\x1b[31m"
+#define ANSI_FG_GREEN      "\x1b[32m"
+#define ANSI_FG_YELLOW     "\x1b[33m"
+#define ANSI_FG_BLUE       "\x1b[34m"
+#define ANSI_FG_MAGENTA    "\x1b[35m"
+#define ANSI_FG_CYAN       "\x1b[36m"
+#define ANSI_FG_WHITE      "\x1b[37m"
+#define ANSI_FG_RESTORE    "\x1b[39;0m"
+#define ANSI_FG_LIGHT_BLUE "\x1b[34;1m"
+#define ANSI_CLEAR         "\x1b[2J\x1b[H"
 
  /**
   * Returns the command prompt of this system
@@ -151,5 +155,6 @@ void acm_println(const char *buf);
 void acm_write(const char *buf, int len);
 void acm_writec(char byte);
 void acm_print(const char *buf);
+void acm_printf(const char *format, ...);
 
 #endif

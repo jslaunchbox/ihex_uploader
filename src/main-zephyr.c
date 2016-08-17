@@ -62,11 +62,6 @@ static int shell_cmd_verbose(int argc, char *argv[]) {
 	return 0;
 }
 
-static int shell_cmd_syntax_help(int argc, char *argv[]) {
-	printf("version jerryscript & zephyr versions\n");
-	return 0;
-}
-
 static int shell_cmd_version(int argc, char *argv[]) {
 	uint32_t version = sys_kernel_version_get();
 
@@ -78,6 +73,7 @@ static int shell_cmd_version(int argc, char *argv[]) {
 	return 0;
 }
 
+/* Debug commands to diagnose problems in the ACM shell */
 static int shell_acm_command(int argc, char *argv[]) {
 	if (argc <= 1)
 		return -1;
@@ -123,6 +119,23 @@ static int shell_clear_command(int argc, char *argv[]) {
 }
 
 static int shell_cmd_test(int argc, char *argv[]) {
+#ifdef TEST_SIZES
+	printf("[time_t] %lu\n", sizeof(time_t));
+	printf("[BYTE] %lu\n", sizeof(BYTE));
+	printf("[DWORD] %lu\n", sizeof(DWORD));
+	printf("[UINT] %lu\n", sizeof(UINT));
+
+	printf("[uint8_t] %lu\n", sizeof(uint8_t));
+	printf("[uint16_t] %lu\n", sizeof(uint16_t));
+	printf("[uint32_t] %lu\n", sizeof(uint32_t));
+	printf("[uint64_t] %lu\n", sizeof(uint64_t));
+
+	printf("[CHAR] %lu\n", sizeof(char));
+	printf("[INT] %lu\n", sizeof(int));
+	printf("[LONG] %lu\n", sizeof(long));
+	printf("[LONG INT] %lu\n", sizeof(long int));
+	printf("[LONG LONG] %lu\n", sizeof(long long));
+#endif
 	return jerryscript_test();
 } /* shell_cmd_test */
 
@@ -177,12 +190,10 @@ static int shell_cmd_handler(int argc, char *argv[]) {
 const struct shell_cmd commands[] =
 {
   SHELL_COMMAND("clear", shell_clear_command),
-  SHELL_COMMAND("syntax", shell_cmd_syntax_help),
   SHELL_COMMAND("version", shell_cmd_version),
   SHELL_COMMAND("test", shell_cmd_test),
   SHELL_COMMAND("acm", shell_acm_command),
   SHELL_COMMAND("verbose", shell_cmd_verbose),
-
   SHELL_COMMAND(NULL, NULL)
 };
 #endif
@@ -191,7 +202,7 @@ void main(void) {
 #ifdef CONFIG_USE_JS_SHELL
 	jerry_init(JERRY_INIT_EMPTY);
 	shell_clear_command(0, 0);
-	printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
+	shell_cmd_version(0, NULL);
 	shell_register_app_cmd_handler(shell_cmd_handler);
 	shell_init(system_get_prompt(), commands);
 	/* Don't call jerry_cleanup() here, as shell_init() returns after setting

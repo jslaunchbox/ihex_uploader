@@ -29,8 +29,10 @@
 
 #include <arch/cpu.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <string.h>
 #include <malloc.h>
 #include <errno.h>
@@ -44,6 +46,7 @@
 #include <toolchain.h>
 #include <sections.h>
 #include <atomic.h>
+
 #include <misc/printk.h>
 
 #include "code-memory.h"
@@ -64,7 +67,18 @@
 #endif /* CONFIG_STDOUT_CONSOLE */
 #endif /* CONFIG_IHEX_UPLOADER_DEBUG */
 
-const char banner[] = "Jerry Uploader " __DATE__ " " __TIME__ "\r\n";
+extern void __stdout_hook_install(int(*fn)(int));
+
+static const char banner[] =
+"ZephyrJerry\r\n" __DATE__ " " __TIME__ "\r\n" \
+"    ____\r\n"\
+"  ,'   Y`.\r\n"\
+" /        \\\r\n"\
+" \\ ()  () /\r\n"\
+"  `. /\\ ,'\r\n"\
+"8===|\"\"|===8\r\n"\
+"    `LL'\r\n";
+
 const char filename[] = "jerry.js";
 
 // Jerryscript in green color
@@ -264,9 +278,25 @@ static void interrupt_handler(struct device *dev) {
 }
 
 /*************************** ACM OUTPUT *******************************/
+/**
+* @brief Output one character to UART ACM
+*
+* @param c Character to output
+* @return The character passed as input.
+*/
+
+static int acm_out(int c) {
+	acm_writec((char)c);
+	return 1;
+}
+
 /*
- * Write into the data buffer,
- * really dislike this wait here from the example
+ * @brief Writes data into the uart and flushes it.
+ *
+ * @param buf Buffer to write
+ * @param len length of buffer
+ *
+ * @todo Really dislike this wait here from the example
  * will probably rewrite it later with a line queue
  */
 
@@ -295,6 +325,16 @@ void acm_print(const char *buf) {
 void acm_println(const char *buf) {
 	acm_write(buf, strlen(buf));
 	acm_write("\r\n", 3);
+}
+
+/**
+* Provide console message implementation for the engine.
+*/
+void acm_printf(const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	vfprintf(stdout, format, args);
+	va_end(args);
 }
 
 /**************************** DEVICE **********************************/
@@ -327,6 +367,8 @@ void uart_uploader_runner(int arg1, int arg2) {
 	uint32_t len = 0;
 
 	DBG("[Listening]\n");
+	__stdout_hook_install(acm_out);
+
 	while (1) {
 		uart_state = UART_INIT;
 		if (uploader_config.interface.init_cb != NULL) {

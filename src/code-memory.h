@@ -18,24 +18,21 @@
 
 #define MAX_JAVASCRIPT_CODE_LEN 4096
 
-#define MAX_FILENAME_SIZE 16
+#define MAX_FILENAME_SIZE 13
 
-struct code_memory {
-	char data[MAX_JAVASCRIPT_CODE_LEN];
-	char filename[MAX_FILENAME_SIZE];
-	uint8_t type;
-	uint16_t curoff;
-	uint16_t curend;
-	uint16_t maxsize;
-};
+#include <fs/fs_interface.h>
+#include <ff.h>
+#include <fs/fat_fs.h>
+#include <fs.h>
 
-#define CODE struct code_memory
+#define CODE ZFILE
 
 CODE *csopen(const char *filename, const char *mode);
+int csexist(const char *path);
 int csseek(CODE *stream, long int offset, int whence);
-size_t cswrite(const char *ptr, size_t size, size_t count, CODE *stream);
-size_t csread(char *ptr, size_t size, size_t count, CODE *stream);
+ssize_t cswrite(const char *ptr, size_t size, size_t count, CODE *stream);
+ssize_t csread(char *ptr, size_t size, size_t count, CODE *stream);
 int csclose(CODE * stream);
-void csdescribe(CODE * stream);
+ssize_t cssize(CODE *file);
 
 #endif

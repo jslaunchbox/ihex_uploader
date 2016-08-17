@@ -23,34 +23,18 @@
 
 /* Zephyr includes */
 #include <zephyr.h>
-
+#include <malloc.h>
 #include <string.h>
 
 /* JerryScript includes */
 #include "jerry-api.h"
 
+#include "uart-uploader.h"
 #include "code-memory.h"
-#include "acm-shell.h"
-
-extern void __stdout_hook_install(int(*fn)(int));
-
-/**
-*
-* @brief Output one character to UART ACM
-*
-* @param c Character to output
-* @return The character passed as input.
-*/
-
-static int acm_out(int c) {
-	acm_writec((char) c);
-	return 1;
-}
 
 void javascript_eval_code(const char *source_buffer) {
 	jerry_value_t ret_val;
 
-	__stdout_hook_install(acm_out);
 	ret_val = jerry_eval((jerry_char_t *)source_buffer,
 		strlen(source_buffer),
 		false);
@@ -63,25 +47,32 @@ void javascript_eval_code(const char *source_buffer) {
 }
 
 void javascript_run_code(const char *file_name) {
-	CODE *code = csopen(file_name, "r");
-
-	if (code == NULL)
+	CODE *fp = csopen(file_name, "r");
+	if (fp == NULL)
 		return;
 
-	size_t len = strlen((char *)code);
-	if (len != code->curend) {
-		printf("Size %u %u missmatch\n",
-			(unsigned int)len,
-			   (unsigned int)code->curend);
+	fs_seek(fp, 0, SEEK_END);
+	off_t len = fs_tell(fp);
+	if (len == 0) {
+		printf("Empty file\n");
+		return;
+	}
+
+	char *buf = (char *) malloc(len);
+
+	fs_seek(fp, 0, SEEK_SET);
+	ssize_t brw = fs_read(fp, buf, len);
+	if (brw < 0) {
+		fs_close(fp);
+		printf(" Failed loading code from disk %s ", file_name);
 		return;
 	}
 
 	/* Setup Global scope code */
-	jerry_value_t parsed_code = jerry_parse((const jerry_char_t *)code, len, false);
+	jerry_value_t parsed_code = jerry_parse((const jerry_char_t *)buf, len, false);
+	free(buf);
 
 	if (!jerry_value_has_error_flag(parsed_code)) {
-		__stdout_hook_install(acm_out);
-
 		/* Execute the parsed source code in the Global scope */
 		jerry_value_t ret_value = jerry_run(parsed_code);
 
@@ -100,8 +91,6 @@ void javascript_run_code(const char *file_name) {
 
 	/* Initialize engine */
 	jerry_init(JERRY_INIT_EMPTY);
-
-	csclose(code);
 }
 
 void javascript_run_snapshot(const char *file_name) {

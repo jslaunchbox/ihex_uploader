@@ -67,6 +67,10 @@
  */
 static CODE *code_memory = NULL;
 
+#ifdef CONFIG_USE_FILESYSTEM
+ZFILE fp;
+#endif
+
 /****************************** IHEX ****************************************/
 
 static bool marker = false;
@@ -100,7 +104,6 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		size_t written = cswrite(ihex->data, ihex->length, 1, code_memory);
 		if (written == 0) {
 			printf("Failed writting into file \n");
-			csdescribe(code_memory);
 			upload_state = UPLOAD_ERROR;
 			return false;
 		}
@@ -128,7 +131,6 @@ uint32_t ihex_process_init() {
 	acm_println("[READY]");
 
 	ihex_begin_read(&ihex);
-
 	code_memory = csopen("test.js", "w+");
 
 	/* Error getting an id for our data storage */
