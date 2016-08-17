@@ -20,14 +20,14 @@ endif
 ZEPHYRINCLUDE += -I$(JERRY_INCLUDE) -I$(DEPS_BASE)
 
 obj-y += main-zephyr.o
-obj-y += uart-uploader.o
 
-obj-y += code-memory.o
 obj-y += jerry-code.o
 
-obj-y += acm-shell.o
+obj-y += file-wrapper.o
 obj-y += ihex-handler.o
 
+obj-y += acm-uart.o
+obj-y += acm-shell.o
 obj-y += shell-state.o
 
 obj-y += ../deps/ihex/kk_ihex_read.o

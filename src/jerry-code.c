@@ -29,8 +29,8 @@
 /* JerryScript includes */
 #include "jerry-api.h"
 
-#include "uart-uploader.h"
-#include "code-memory.h"
+#include "acm-uart.h"
+#include "file-wrapper.h"
 
 void javascript_eval_code(const char *source_buffer) {
 	jerry_value_t ret_val;
@@ -47,7 +47,7 @@ void javascript_eval_code(const char *source_buffer) {
 }
 
 void javascript_run_code(const char *file_name) {
-	CODE *fp = csopen(file_name, "r");
+	ZFILE *fp = csopen(file_name, "r");
 	if (fp == NULL)
 		return;
 

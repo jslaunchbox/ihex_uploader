@@ -29,70 +29,49 @@
 #include <misc/printk.h>
 #include <ctype.h>
 
-#include "uart-uploader.h"
+#include "acm-uart.h"
 #include "acm-shell.h"
-#include "ihex-handler.h"
-#include "code-memory.h"
 #include "shell-state.h"
-#include "jerry-code.h"
 
-#define CMD_TRANSFER_IHEX  "ihex"
-#define CMD_TRANSFER_RAW   "raw"
-#define CMD_TRANSFER       "transfer"
-#define CMD_FILENAME       "filename"
-#define CMD_AT             "at"
-#define CMD_LS             "ls"
-#define CMD_RUN            "run"
-#define CMD_SET            "set"
-#define CMD_GET            "get"
-#define CMD_LOAD           "load"
-#define CMD_TEST           "test"
-#define CMD_CLEAR          "clear"
-#define CMD_BLUETOOTH      "bl"
-#define CMD_HELP           "help"
-#define CMD_LOAD           "load"
-#define CMD_CAT            "cat"
-#define CMD_EVAL           "eval"
-#define CMD_DU             "du"
+#include "file-wrapper.h"
+#include "ihex-handler.h"
+#include "jerry-code.h"
 
 /*
  * Contains the pointer to the memory where the code will be uploaded
- * using the stub interface at code_memory.c
+ * using the stub interface at file_code.c
  */
-static CODE *code_memory = NULL;
+static ZFILE *file_code = NULL;
 
 /* Configuration of the callbacks to be called */
 static struct shell_state_config shell = {
-	.filename = "test.js",
 	.state_flags = kShellTransferRaw
 };
-
-#define RET_OK      0
-#define RET_ERROR   -1
-#define RET_UNKNOWN -2
 
 const char ERROR_NOT_RECOGNIZED[] = "Unknown command";
 const char ERROR_NOT_ENOUGH_ARGUMENTS[] = "Not enough arguments";
 const char ERROR_FILE_NOT_FOUND[] = "File not found";
 const char ERROR_EXCEDEED_SIZE[] = "String too long";
 
-const char MSG_FILE_SAVED[] = ANSI_FG_GREEN "Saving file. " ANSI_FG_RESTORE "run the 'run' command to see the result";
+const char MSG_FILE_SAVED[] = ANSI_FG_GREEN "Saving file. " ANSI_FG_RESTORE
+	"run the 'run' command to see the result";
+
 const char MSG_FILE_ABORTED[] = ANSI_FG_RED "Aborted!";
 const char MSG_EXIT[] = ANSI_FG_GREEN "Back to shell!";
 
 const char READY_FOR_RAW_DATA[] = "Ready for JavaScript. \r\n" \
-"\tCtrl+Z or <EOF> to finish transfer.\r\n" \
-"\tCtrl+X or Ctrl+C to cancel.";
+	"\tCtrl+Z or <EOF> to finish transfer.\r\n" \
+	"\tCtrl+X or Ctrl+C to cancel.";
 
 const char MSG_IMMEDIATE_MODE[] = "Ready to evaluate JavaScript.\r\n" \
-"\tCtrl+X or Ctrl+C to return to shell.";
+	"\tCtrl+X or Ctrl+C to return to shell.";
 
 const char READY_FOR_IHEX_DATA[] = "[BEGIN IHEX]";
 const char hex_prompt[] = "HEX> ";
 const char raw_prompt[] = ANSI_FG_YELLOW "RAW> " ANSI_FG_RESTORE;
 const char eval_prompt[] = ANSI_FG_GREEN "js> " ANSI_FG_RESTORE;
 
-#define MAX_ARGUMENT_SIZE 32
+#define CMD_TRANSFER "transfer"
 
 #define READ_BUFFER_SIZE 4
 
@@ -103,24 +82,7 @@ const char eval_prompt[] = ANSI_FG_GREEN "js> " ANSI_FG_RESTORE;
 #define DBG printk
 #endif /* CONFIG_IHEX_UPLOADER_DEBUG */
 
-#define CONFIG_USE_FILESYSTEM
-
-#ifdef CONFIG_USE_FILESYSTEM
-#include <fs/fs_interface.h>
-#include <ff.h>
-#include <fs/fat_fs.h>
-#include <fs.h>
-#endif
-
-#ifdef CONFIG_USE_FILESYSTEM
-ZFILE *fp;
-#endif
-
-const char *ashell_get_filename() {
-	return shell.filename;
-}
-
-uint32_t ashell_get_filename_buffer(const char *buf, char *destination) {
+int32_t ashell_get_filename_buffer(const char *buf, char *destination) {
 	uint32_t arg_len = 0;
 	uint32_t len = strlen(buf);
 	if (len == 0)
@@ -129,24 +91,80 @@ uint32_t ashell_get_filename_buffer(const char *buf, char *destination) {
 	buf = ashell_get_next_arg_s(buf, len, destination, MAX_FILENAME_SIZE, &arg_len);
 
 	if (arg_len == 0) {
-		strcpy(destination, shell.filename);
+		*destination = '\0';
+		printf(ERROR_NOT_ENOUGH_ARGUMENTS);
+		return RET_ERROR;
 	}
+
 	return arg_len;
 }
 
-int32_t ashell_list_dir(const char *buf) {
-	int res;
-	ZDIR dp;
-	static struct zfs_dirent entry;
-
+int32_t ashell_remove_file(char *buf) {
 	char filename[MAX_FILENAME_SIZE];
 	if (ashell_get_filename_buffer(buf, filename) <= 0) {
 		return RET_ERROR;
 	}
 
+	int res = fs_unlink(filename);
+	if (!res)
+		return RET_OK;
+
+	printf("rm: cannot remove '%s': %d\n", filename, res);
+	return RET_ERROR;
+}
+
+int32_t ashell_remove_dir(char *buf) {
+	printf("rmdir: Not implemented \n");
+	return RET_OK;
+}
+
+int32_t ashell_make_dir(char *buf) {
+	printf("mkdir: Not implemented \n");
+	return RET_OK;
+}
+
+int32_t ashell_disk_usage(char *buf) {
+	char filename[MAX_FILENAME_SIZE];
+	if (ashell_get_filename_buffer(buf, filename) <= 0) {
+		return RET_ERROR;
+	}
+
+	ZFILE *file = csopen(filename, "r");
+	if (file == NULL) {
+		acm_println(ERROR_FILE_NOT_FOUND);
+		return RET_ERROR;
+	}
+
+	ssize_t size = cssize(file);
+	csclose(file);
+
+	printf("%5ld %s\n", size, filename);
+	return RET_OK;
+}
+
+int32_t ashell_list_dir(char *buf) {
+	char filename[MAX_FILENAME_SIZE];
+	static struct zfs_dirent entry;
+	int32_t res;
+	ZDIR dp;
+
+	*filename = '\0';
+	if (ashell_get_filename_buffer(buf, filename) > 0) {
+		/* Check if file or directory */
+		if (!fs_stat(filename, &entry)) {
+			if (entry.type == DIR_ENTRY_FILE) {
+				ashell_disk_usage(filename);
+				return RET_OK;
+			}
+		} else {
+			printf("ls: cannot access %s: no such file or directory\n", filename);
+			return RET_ERROR;
+		}
+	}
+
 	res = fs_opendir(&dp, filename);
 	if (res) {
-		printf("Error opening dir[%d]\n", res);
+		printf("Error opening dir [%lu]\n", res);
 		return res;
 	}
 
@@ -175,10 +193,10 @@ int32_t ashell_list_dir(const char *buf) {
 	return 0;
 }
 
-int32_t ashell_print_file(const char *buf) {
+int32_t ashell_print_file(char *buf) {
 	char filename[MAX_FILENAME_SIZE];
 	char data[READ_BUFFER_SIZE];
-	CODE *file;
+	ZFILE *file;
 	size_t count;
 
 	if (ashell_get_filename_buffer(buf, filename) <= 0) {
@@ -193,7 +211,7 @@ int32_t ashell_print_file(const char *buf) {
 	printk("Open [%s]\n", filename);
 	file = csopen(filename, "r");
 
-	// Error getting an id for our data storage
+	/* Error getting an id for our data storage */
 	if (!file) {
 		acm_println(ERROR_FILE_NOT_FOUND);
 		return RET_ERROR;
@@ -232,47 +250,16 @@ int32_t ashell_run_javascript(char *buf) {
 	return RET_OK;
 }
 
-int32_t ashell_disk_usage(char *buf) {
-	char filename[MAX_FILENAME_SIZE];
-	if (ashell_get_filename_buffer(buf, filename) <= 0) {
-		return RET_ERROR;
-	}
-
-	CODE *file = csopen(filename, "r");
-	if (file == NULL) {
-		acm_println(ERROR_FILE_NOT_FOUND);
-		return RET_ERROR;
-	}
-
-	ssize_t size = cssize(file);
-	csclose(file);
-
-	printf("%5ld %s\n", size, filename);
-	return RET_OK;
-}
-
-int32_t ashell_help(const char *buf) {
+int32_t ashell_help(char *buf) {
 	acm_println("TODO: Read help file!");
 	return RET_OK;
 }
 
-int32_t ashell_set_filename(char *buf) {
-	if (ashell_get_filename_buffer(buf, shell.filename) <= 0) {
-		acm_print(ERROR_NOT_ENOUGH_ARGUMENTS);
-		return RET_ERROR;
-	}
-
-	acm_print("Filename [");
-	acm_print(shell.filename);
-	acm_println("]");
-	return RET_OK;
-}
-
-int32_t ashell_start_raw_capture() {
-	code_memory = csopen(shell.filename, "w+");
+int32_t ashell_start_raw_capture(char *filename) {
+	file_code = csopen(filename, "w+");
 
 	/* Error getting an id for our data storage */
-	if (!code_memory) {
+	if (!file_code) {
 		return RET_ERROR;
 	}
 
@@ -280,14 +267,13 @@ int32_t ashell_start_raw_capture() {
 }
 
 int32_t ashell_close_capture() {
-	return csclose(code_memory);
+	return csclose(file_code);
 }
 
 int32_t ashell_discard_capture() {
-	csclose(code_memory);
-	/* TODO: Delete file
-	 return csdelete(shell.filename);
-	*/
+	csclose(file_code);
+
+	/* TODO fs_unlink(); */
 	return 0;
 }
 
@@ -325,7 +311,7 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 					acm_println(MSG_FILE_SAVED);
 					shell.state_flags &= ~kShellCaptureRaw;
 					acm_set_prompt(NULL);
-					cswrite(&eol, 1, 1, code_memory);
+					cswrite(&eol, 1, 1, file_code);
 					ashell_close_capture();
 					return RET_OK;
 					break;
@@ -344,7 +330,7 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 					printf("%c", byte);
 			}
 		} else {
-			size_t written = cswrite(&byte, 1, 1, code_memory);
+			size_t written = cswrite(&byte, 1, 1, file_code);
 			if (written == 0) {
 				return RET_ERROR;
 			}
@@ -353,17 +339,23 @@ int32_t ashell_raw_capture(const char *buf, uint32_t len) {
 		len--;
 	}
 
-	cswrite(&eol, 1, 1, code_memory);
+	cswrite(&eol, 1, 1, file_code);
 	return 0;
 }
 
 int32_t ashell_read_data(char *buf) {
+	char filename[MAX_FILENAME_SIZE];
 	if (shell.state_flags & kShellTransferRaw) {
+		if (ashell_get_filename_buffer(buf, filename) <= 0) {
+			return RET_ERROR;
+		}
+
 		acm_println(ANSI_CLEAR);
+		acm_printf("Saving to %s \r\n", filename);
 		acm_println(READY_FOR_RAW_DATA);
 		acm_set_prompt(raw_prompt);
 		shell.state_flags |= kShellCaptureRaw;
-		ashell_start_raw_capture();
+		ashell_start_raw_capture(filename);
 	}
 
 	if (shell.state_flags & kShellTransferIhex) {
@@ -388,41 +380,34 @@ int32_t ashell_set_transfer_state(char *buf) {
 		return -1;
 	}
 	next = ashell_get_token_arg(buf);
-
-	printf(" Arg [%s]\n", buf);
 	acm_println(buf);
 
-	if (!strcmp(CMD_TRANSFER_RAW, buf)) {
+	if (!strcmp("raw", buf)) {
 		acm_set_prompt(NULL);
 		shell.state_flags |= kShellTransferRaw;
 		shell.state_flags &= ~kShellTransferIhex;
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_TRANSFER_IHEX, buf)) {
+	if (!strcmp("ihex", buf)) {
 		acm_set_prompt(hex_prompt);
 		shell.state_flags |= kShellTransferIhex;
 		shell.state_flags &= ~kShellTransferRaw;
 		return RET_OK;
 	}
-
 	return RET_UNKNOWN;
 }
 
 int32_t ashell_set_state(char *buf) {
-	char *next;
 	if (buf == 0) {
 		acm_println(ERROR_NOT_ENOUGH_ARGUMENTS);
-		return -1;
+		return RET_ERROR;
 	}
-	next = ashell_get_token_arg(buf);
 
+	char *next = ashell_get_token_arg(buf);
 	if (!strcmp(CMD_TRANSFER, buf)) {
 		return ashell_set_transfer_state(next);
-	} else
-		if (!strcmp(CMD_FILENAME, buf)) {
-			return ashell_set_filename(next);
-		}
+	}
 
 	return RET_UNKNOWN;
 }
@@ -438,7 +423,7 @@ int32_t ashell_get_state(char *buf) {
 	next = ashell_get_token_arg(buf);
 
 	if (!strcmp(CMD_TRANSFER, buf)) {
-		printf("Flags %lu\n", shell.state_flags);
+		DBG("Flags %lu\n", shell.state_flags);
 
 		if (shell.state_flags & kShellTransferRaw)
 			acm_println("Raw");
@@ -449,12 +434,22 @@ int32_t ashell_get_state(char *buf) {
 		return RET_OK;
 	}
 
-	if (!strcmp(CMD_FILENAME, buf)) {
-		acm_println(shell.filename);
-		return RET_OK;
-	}
-
 	return RET_UNKNOWN;
+}
+
+int32_t ashell_at(char *buf) {
+	acm_println("OK\r\n");
+	return RET_OK;
+}
+
+int32_t ashell_test(char *buf) {
+	acm_println("TEST OK\r\n");
+	return RET_OK;
+}
+
+int32_t ashell_clear(char *buf) {
+	acm_print(ANSI_CLEAR);
+	return RET_OK;
 }
 
 int32_t ashell_check_control(const char *buf, uint32_t len) {
@@ -472,22 +467,47 @@ int32_t ashell_check_control(const char *buf, uint32_t len) {
 	return 0;
 }
 
+#define ASHELL_COMMAND(name,cmd) {name, cmd}
+
+static const struct shell_cmd commands[] =
+{
+	ASHELL_COMMAND("set",   ashell_set_state),
+	ASHELL_COMMAND("get",   ashell_get_state),
+	ASHELL_COMMAND("load",  ashell_read_data),
+	ASHELL_COMMAND("at",    ashell_at),
+	ASHELL_COMMAND("test",  ashell_test),
+	ASHELL_COMMAND("raw",   ashell_get_state),
+	ASHELL_COMMAND("run",   ashell_run_javascript),
+	ASHELL_COMMAND("eval",  ashell_js_immediate_mode),
+	ASHELL_COMMAND("ls",    ashell_list_dir),
+	ASHELL_COMMAND("cat",   ashell_print_file),
+	ASHELL_COMMAND("du",    ashell_disk_usage),
+	ASHELL_COMMAND("rm",    ashell_remove_file),
+	ASHELL_COMMAND("rmdir", ashell_remove_dir),
+	ASHELL_COMMAND("mkdir", ashell_make_dir),
+	ASHELL_COMMAND("help",  ashell_help),
+	ASHELL_COMMAND("clear", ashell_clear)
+};
+
+#define ASHELL_COMMANDS_COUNT (sizeof(commands)/sizeof(struct shell_cmd))
+
 int32_t ashell_main_state(char *buf, uint32_t len) {
+	uint32_t t;
 	char *next;
 	uint32_t argc;
 
+	/* Raw line to be evaluated by JS */
 	if (shell.state_flags & kShellEvalJavascript) {
 		return ashell_eval_javascript(buf, len);
 	}
 
-	/* Capture data into the buffer */
+	/* Capture data into the raw buffer */
 	if (shell.state_flags & kShellCaptureRaw) {
 		return ashell_raw_capture(buf, len);
 	}
 
-	DBG("[BOF]");
-	DBG("%s", buf);
-	DBG("[EOF]");
+	/* Special characters check for ESC, cancel and commands */
+	DBG("[BOF]%s[EOF]", buf);
 	ashell_check_control(buf, len);
 
 	argc = ashell_get_argc(buf, len);
@@ -496,62 +516,18 @@ int32_t ashell_main_state(char *buf, uint32_t len) {
 	if (argc == 0)
 		return 0;
 
+	/* Null terminate again, protect the castle */
 	buf[len] = '\0';
 	buf = ashell_skip_spaces(buf);
 	if (buf == NULL)
 		return 0;
 
+	/* Tokenize and isolate the command */
 	next = ashell_get_token_arg(buf);
 
-	if (!strcmp(CMD_SET, buf)) {
-		return ashell_set_state(next);
-	}
-
-	if (!strcmp(CMD_GET, buf)) {
-		return ashell_get_state(next);
-	}
-
-	if (!strcmp(CMD_TEST, buf)) {
-		acm_println("Hi world");
-		return RET_OK;
-	}
-
-	if (!strcmp(CMD_AT, buf)) {
-		acm_println("OK");
-		return RET_OK;
-	}
-
-	if (!strcmp(CMD_CLEAR, buf)) {
-		acm_print(ANSI_CLEAR);
-		return RET_OK;
-	}
-
-	if (!strcmp(CMD_LOAD, buf)) {
-		return ashell_read_data(next);
-	}
-
-	if (!strcmp(CMD_HELP, buf)) {
-		return ashell_help(next);
-	}
-
-	if (!strcmp(CMD_RUN, buf)) {
-		return ashell_run_javascript(next);
-	}
-
-	if (!strcmp(CMD_CAT, buf)) {
-		return ashell_print_file(next);
-	}
-
-	if (!strcmp(CMD_LS, buf)) {
-		return ashell_list_dir(next);
-	}
-
-	if (!strcmp(CMD_EVAL, buf)) {
-		return ashell_js_immediate_mode(next);
-	}
-
-	if (!strcmp(CMD_DU, buf)) {
-		return ashell_disk_usage(next);
+	for (t = 0; t < ASHELL_COMMANDS_COUNT; t++) {
+		if (!strcmp(commands[t].cmd_name, buf))
+			commands[t].cb(next);
 	}
 
 	return RET_UNKNOWN;

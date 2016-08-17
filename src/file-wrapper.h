@@ -25,14 +25,12 @@
 #include <fs/fat_fs.h>
 #include <fs.h>
 
-#define CODE ZFILE
-
-CODE *csopen(const char *filename, const char *mode);
+ZFILE *csopen(const char *filename, const char *mode);
 int csexist(const char *path);
-int csseek(CODE *stream, long int offset, int whence);
-ssize_t cswrite(const char *ptr, size_t size, size_t count, CODE *stream);
-ssize_t csread(char *ptr, size_t size, size_t count, CODE *stream);
-int csclose(CODE * stream);
-ssize_t cssize(CODE *file);
+int csseek(ZFILE *stream, long int offset, int whence);
+ssize_t cswrite(const char *ptr, size_t size, size_t count, ZFILE *stream);
+ssize_t csread(char *ptr, size_t size, size_t count, ZFILE *stream);
+int csclose(ZFILE * stream);
+ssize_t cssize(ZFILE *file);
 
 #endif

@@ -49,10 +49,10 @@
 
 #include <misc/printk.h>
 
-#include "code-memory.h"
+#include "file-wrapper.h"
 #include "jerry-code.h"
 
-#include "uart-uploader.h"
+#include "acm-uart.h"
 #include "ihex/kk_ihex_read.h"
 
 #ifndef CONFIG_IHEX_UPLOADER_DEBUG

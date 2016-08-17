@@ -29,10 +29,11 @@
 #include <misc/printk.h>
 #include <ctype.h>
 
-#include "uart-uploader.h"
-#include "code-memory.h"
+#include "acm-uart.h"
 #include "acm-shell.h"
 #include "shell-state.h"
+
+#include "file-wrapper.h"
 #include "ihex-handler.h"
 
 static const char acm_default_prompt[] = ANSI_FG_YELLOW "acm> " ANSI_FG_RESTORE;

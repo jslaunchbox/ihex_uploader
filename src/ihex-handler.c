@@ -42,12 +42,12 @@
 #include <atomic.h>
 #include <misc/printk.h>
 
-#include "code-memory.h"
+#include "file-wrapper.h"
 #include "jerry-code.h"
 
-#include "uart-uploader.h"
-#include "ihex/kk_ihex_read.h"
+#include "acm-uart.h"
 #include "acm-shell.h"
+#include "ihex/kk_ihex_read.h"
 
 #ifndef CONFIG_IHEX_UPLOADER_DEBUG
 #define DBG(...) { ; }
@@ -65,7 +65,7 @@
  * Contains the pointer to the memory where the code will be uploaded
  * using the stub interface at code_memory.c
  */
-static CODE *code_memory = NULL;
+static ZFILE *code_memory = NULL;
 
 #ifdef CONFIG_USE_FILESYSTEM
 ZFILE fp;
@@ -131,7 +131,7 @@ uint32_t ihex_process_init() {
 	acm_println("[READY]");
 
 	ihex_begin_read(&ihex);
-	code_memory = csopen("test.js", "w+");
+	code_memory = csopen("temp.dat", "w+");
 
 	/* Error getting an id for our data storage */
 	if (!code_memory) {

@@ -22,8 +22,7 @@
 
 #include "jerry-api.h"
 
-#include "uart-uploader.h"
-#include "ihex-handler.h"
+#include "acm-uart.h"
 #include "acm-shell.h"
 
 #define CONFIG_USE_JS_SHELL
@@ -187,7 +186,7 @@ static int shell_cmd_handler(int argc, char *argv[]) {
 
 #define SHELL_COMMAND(name,cmd) { name, cmd }
 
-const struct shell_cmd commands[] =
+static const struct shell_cmd commands[] =
 {
   SHELL_COMMAND("clear", shell_clear_command),
   SHELL_COMMAND("version", shell_cmd_version),

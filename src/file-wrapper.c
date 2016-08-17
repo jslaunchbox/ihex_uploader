@@ -17,7 +17,7 @@
 /**
  * @file
  * @brief Simulates the disk access to create a writtable memory section
- * to help on the transactions between the UART and the Javascript code
+ * to help on the transactions between the UART and the Javascript ZFILE
  * this is a basic stub, do not expect a full implementation.
  */
 
@@ -35,7 +35,7 @@
 
 #include <misc/printk.h>
 #include <malloc.h>
-#include "code-memory.h"
+#include "file-wrapper.h"
 
 int csexist(const char *path) {
 	int res;
@@ -44,7 +44,7 @@ int csexist(const char *path) {
 	return !res;
 }
 
-CODE *csopen(const char * filename, const char * mode) {
+ZFILE *csopen(const char * filename, const char * mode) {
 	printk("[OPEN] %s\n",filename);
 	int res;
 
@@ -60,16 +60,16 @@ CODE *csopen(const char * filename, const char * mode) {
 		}
 	}
 
-	CODE *code = (CODE *)malloc(sizeof(CODE));
-	res = fs_open(code, filename);
+	ZFILE *file = (ZFILE *) malloc(sizeof(ZFILE));
+	res = fs_open(file, filename);
 	if (res) {
 		printk("Failed opening file [%d]\n", res);
 		return NULL;
 	}
-	return code;
+	return file;
 }
 
-int csseek(CODE *fp, long int offset, int whence) {
+int csseek(ZFILE *fp, long int offset, int whence) {
 	int res = fs_seek(fp, offset, whence);
 	if (res) {
 		printk("fs_seek failed [%d]\n", res);
@@ -80,7 +80,7 @@ int csseek(CODE *fp, long int offset, int whence) {
 	return 0;
 }
 
-ssize_t cssize(CODE *file) {
+ssize_t cssize(ZFILE *file) {
 	if (csseek(file, 0, SEEK_END)!=0)
 		return -1;
 
@@ -88,7 +88,7 @@ ssize_t cssize(CODE *file) {
 	return file_len;
 }
 
-ssize_t cswrite(const char * ptr, size_t size, size_t count, CODE * fp) {
+ssize_t cswrite(const char * ptr, size_t size, size_t count, ZFILE * fp) {
 	ssize_t brw;
 	size *= count;
 
@@ -105,7 +105,7 @@ ssize_t cswrite(const char * ptr, size_t size, size_t count, CODE * fp) {
 	return brw;
 }
 
-ssize_t csread(char * ptr, size_t size, size_t count, CODE * fp) {
+ssize_t csread(char * ptr, size_t size, size_t count, ZFILE * fp) {
 	ssize_t brw = fs_read(fp, ptr, size);
 	if (brw < 0) {
 		printk("Failed reading file [%d]\n", brw);
@@ -115,16 +115,16 @@ ssize_t csread(char * ptr, size_t size, size_t count, CODE * fp) {
 	return brw;
 }
 
-int csclose(CODE * fp) {
+int csclose(ZFILE * fp) {
 	printk("[CLOSE]\n");
 	int res = fs_close(fp);
 	free(fp);
 	return res;
 }
 
-#ifdef CONFIG_CODE_MEMORY_TESTING
+#ifdef CONFIG_ZFILE_MEMORY_TESTING
 void main() {
-	CODE *myfile;
+	ZFILE *myfile;
 
 	myfile = csopen("test.js", "w+");
 	printk(" Getting memory %p \n", myfile);
