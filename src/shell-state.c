@@ -351,7 +351,7 @@ int32_t ashell_read_data(char *buf) {
 		}
 
 		acm_println(ANSI_CLEAR);
-		acm_printf("Saving to %s \r\n", filename);
+		acm_printf("Saving to '%s' \r\n", filename);
 		acm_println(READY_FOR_RAW_DATA);
 		acm_set_prompt(raw_prompt);
 		shell.state_flags |= kShellCaptureRaw;

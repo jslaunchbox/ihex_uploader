@@ -25,14 +25,13 @@
 #include "acm-uart.h"
 #include "acm-shell.h"
 
+#include <misc/printk.h>
+
 #define CONFIG_USE_JS_SHELL
-#define CONFIG_USE_IHEX_UPLOADER
 
- //#define CONFIG_USE_IHEX_LOADER_ONLY
-
-  /**
-   * Jerryscript simple test loop
-   */
+/**
+ * Jerryscript simple test loop
+ */
 int jerryscript_test() {
 	jerry_value_t ret_val;
 
@@ -50,16 +49,7 @@ int jerryscript_test() {
 }
 
 #ifdef CONFIG_USE_JS_SHELL
-#define VERBOSE 0x01
-
 static char *source_buffer = NULL;
-static unsigned char flags = 0;
-
-static int shell_cmd_verbose(int argc, char *argv[]) {
-	printf("Enable verbose \n");
-	flags |= VERBOSE;
-	return 0;
-}
 
 static int shell_cmd_version(int argc, char *argv[]) {
 	uint32_t version = sys_kernel_version_get();
@@ -78,18 +68,9 @@ static int shell_acm_command(int argc, char *argv[]) {
 		return -1;
 
 	char *cmd = argv[1];
-
-	printf("[ACM] %s\n", cmd);
-
-#ifdef CONFIG_UART_LINE_CTRL
-	if (!strcmp(cmd, "get_baudrate")) {
-		uart_get_baudrate();
-		return 0;
-	}
-#endif
-
 	if (!strcmp(cmd, "clear")) {
-		uart_clear();
+		printk(ANSI_CLEAR);
+		acm_clear();
 		return 0;
 	}
 
@@ -104,10 +85,11 @@ static int shell_acm_command(int argc, char *argv[]) {
 	}
 
 	if (!strcmp(cmd, "status")) {
-		uart_print_status();
+		acm_print_status();
 		return 0;
 	}
-	printf("Command unknown\n");
+
+	printk("Command unknown\n");
 	return 0;
 } /* shell_acm_command */
 
@@ -163,10 +145,6 @@ static int shell_cmd_handler(int argc, char *argv[]) {
 
 	*(d - 1) = '\0';
 
-	if (flags & VERBOSE) {
-		printf("[%s] %lu\n", source_buffer, strlen(source_buffer));
-	}
-
 	jerry_value_t ret_val;
 
 	ret_val = jerry_eval((jerry_char_t *)source_buffer,
@@ -192,7 +170,6 @@ static const struct shell_cmd commands[] =
   SHELL_COMMAND("version", shell_cmd_version),
   SHELL_COMMAND("test", shell_cmd_test),
   SHELL_COMMAND("acm", shell_acm_command),
-  SHELL_COMMAND("verbose", shell_cmd_verbose),
   SHELL_COMMAND(NULL, NULL)
 };
 #endif
@@ -204,16 +181,12 @@ void main(void) {
 	shell_cmd_version(0, NULL);
 	shell_register_app_cmd_handler(shell_cmd_handler);
 	shell_init(system_get_prompt(), commands);
+#endif
 	/* Don't call jerry_cleanup() here, as shell_init() returns after setting
 	   up background task to process shell input, and that task calls
 	   shell_cmd_handler(), etc. as callbacks. This processing happens in
 	   the infinite loop, so JerryScript doesn't need to be de-initialized. */
-#endif
 
-#ifdef CONFIG_USE_IHEX_LOADER_ONLY
-	ihex_process_start();
-#else
 	ashell_process_start();
-#endif
 }
 

@@ -55,7 +55,7 @@
 #include "acm-uart.h"
 #include "ihex/kk_ihex_read.h"
 
-#ifndef CONFIG_IHEX_UPLOADER_DEBUG
+#ifndef CONFIG_IHEX_DEBUG
 #define DBG(...) { ; }
 #else
 #if defined(CONFIG_STDOUT_CONSOLE)
@@ -65,7 +65,7 @@
 #include <misc/printk.h>
 #define DBG printk
 #endif /* CONFIG_STDOUT_CONSOLE */
-#endif /* CONFIG_IHEX_UPLOADER_DEBUG */
+#endif /* CONFIG_IHEX_DEBUG */
 
 extern void __stdout_hook_install(int(*fn)(int));
 
@@ -92,7 +92,7 @@ const char *system_get_prompt() {
 #define FIFO_CACHE 2
 
 /* Configuration of the callbacks to be called */
-static struct uploader_cfg_data uploader_config = {
+static struct acm_cfg_data acm_config = {
 	/** Callback to be notified on connection status change */
 	.cb_status = NULL,
 	.interface = {
@@ -105,7 +105,7 @@ static struct uploader_cfg_data uploader_config = {
 	.print_state = NULL
 };
 
-struct uart_uploader_input {
+struct acm_input {
 	int _unused;
 	char line[MAX_LINE_LEN + 1];
 };
@@ -119,20 +119,20 @@ static uint8_t max_fifo_size = 0;
 uint32_t alloc_count = 0;
 uint32_t free_count = 0;
 
-struct uart_uploader_input *fifo_get_isr_buffer() {
+struct acm_input *fifo_get_isr_buffer() {
 	void *data = nano_isr_fifo_get(&avail_queue, TICKS_NONE);
 	if (!data) {
-		data = (void *)malloc(sizeof(struct uart_uploader_input));
-		memset(data, '-', sizeof(struct uart_uploader_input));
+		data = (void *)malloc(sizeof(struct acm_input));
+		memset(data, '-', sizeof(struct acm_input));
 		alloc_count++;
 		fifo_size++;
 		if (fifo_size > max_fifo_size)
 			max_fifo_size = fifo_size;
 	}
-	return (struct uart_uploader_input *) data;
+	return (struct acm_input *) data;
 }
 
-void fifo_recycle_buffer(struct uart_uploader_input *data) {
+void fifo_recycle_buffer(struct acm_input *data) {
 	if (fifo_size > FIFO_CACHE) {
 		free(data);
 		fifo_size--;
@@ -142,7 +142,7 @@ void fifo_recycle_buffer(struct uart_uploader_input *data) {
 	nano_task_fifo_put(&avail_queue, data);
 }
 
-void uart_clear(void) {
+void acm_clear(void) {
 	void *data = NULL;
 	do {
 		if (data != NULL)
@@ -189,11 +189,11 @@ enum {
 	UART_TERMINATED
 };
 
-static struct uart_uploader_input *data = NULL;
+static struct acm_input *data = NULL;
 static uint32_t tail = 0;
 static char *buf;
 
-static void interrupt_handler(struct device *dev) {
+static void acm_interrupt_handler(struct device *dev) {
 	char byte;
 
 	uint32_t bytes_read = 0;
@@ -339,30 +339,26 @@ void acm_printf(const char *format, ...) {
 
 /**************************** DEVICE **********************************/
 
-void process_set_config(struct uploader_cfg_data *config) {
-	memcpy(&uploader_config, config, sizeof(struct uploader_cfg_data));
+void process_set_config(struct acm_cfg_data *config) {
+	memcpy(&acm_config, config, sizeof(struct acm_cfg_data));
 }
 
-uint8_t uart_get_last_state() {
-	return uart_state;
-}
-
-void uart_print_status() {
+void acm_print_status() {
 	printf("******* SYSTEM STATE ********\n");
 
-	if (uploader_config.print_state != NULL)
-		uploader_config.print_state();
+	if (acm_config.print_state != NULL)
+		acm_config.print_state();
 
-	printf("[State] %d\n", (int)uart_get_last_state());
+	printf("[State] %d\n", (int)uart_state);
 	printf("[Mem] Fifo %d Max Fifo %d Alloc %d Free %d \n",
 		(int)fifo_size, (int)max_fifo_size, (int)alloc_count, (int)free_count);
-	printf("Max fifo %d bytes\n", (int)(max_fifo_size * sizeof(struct uart_uploader_input)));
+	printf("Max fifo %d bytes\n", (int)(max_fifo_size * sizeof(struct acm_input)));
 	printf("[Data] Received %d Processed %d \n",
 		(int)bytes_received, (int)bytes_processed);
 }
 
-void uart_uploader_runner(int arg1, int arg2) {
-	static struct uart_uploader_input *data = NULL;
+void acm_runner() {
+	static struct acm_input *data = NULL;
 	char *buf = NULL;
 	uint32_t len = 0;
 
@@ -371,12 +367,12 @@ void uart_uploader_runner(int arg1, int arg2) {
 
 	while (1) {
 		uart_state = UART_INIT;
-		if (uploader_config.interface.init_cb != NULL) {
+		if (acm_config.interface.init_cb != NULL) {
 			DBG("[Init]\n");
-			uploader_config.interface.init_cb();
+			acm_config.interface.init_cb();
 		}
 
-		while (!uploader_config.interface.is_done()) {
+		while (!acm_config.interface.is_done()) {
 			uart_state = UART_WAITING;
 
 			while (data == NULL) {
@@ -389,11 +385,11 @@ void uart_uploader_runner(int arg1, int arg2) {
 				DBG("%s\n", buf);
 			}
 
-			uint32_t processed = uploader_config.interface.process_cb(buf, len);
+			uint32_t processed = acm_config.interface.process_cb(buf, len);
 
 			bytes_processed += processed;
 
-			if (uploader_config.interface.is_done()) {
+			if (acm_config.interface.is_done()) {
 				len -= processed;
 				memcpy(buf, buf + processed, len);
 				buf[len] = '\0';
@@ -407,8 +403,8 @@ void uart_uploader_runner(int arg1, int arg2) {
 		}
 
 		uart_state = UART_CLOSE;
-		if (uploader_config.interface.close_cb != NULL)
-			uploader_config.interface.close_cb();
+		if (acm_config.interface.close_cb != NULL)
+			acm_config.interface.close_cb();
 	}
 
 	// Not possible
@@ -416,7 +412,7 @@ void uart_uploader_runner(int arg1, int arg2) {
 }
 
 #ifdef CONFIG_UART_LINE_CTRL
-uint32_t uart_get_baudrate(void) {
+uint32_t acm_get_baudrate(void) {
 	uint32_t baudrate;
 
 	int ret = uart_line_ctrl_get(dev_upload, LINE_CTRL_BAUD_RATE, &baudrate);
@@ -463,17 +459,17 @@ void acm() {
 	/* Wait 1 sec for the host to do all settings */
 	sys_thread_busy_wait(1000000);
 
-	uart_get_baudrate();
+	acm_get_baudrate();
 #endif
 
 	uart_irq_rx_disable(dev_upload);
 	uart_irq_tx_disable(dev_upload);
 
-	uart_irq_callback_set(dev_upload, interrupt_handler);
+	uart_irq_callback_set(dev_upload, acm_interrupt_handler);
 	acm_write(banner, sizeof(banner));
 
 	/* Enable rx interrupts */
 	uart_irq_rx_enable(dev_upload);
 
-	uart_uploader_runner(0, 0);
+	acm_runner();
 }

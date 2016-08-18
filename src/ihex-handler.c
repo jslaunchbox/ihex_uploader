@@ -207,7 +207,7 @@ void ihex_print_status() {
 }
 
 void ihex_process_start() {
-	struct uploader_cfg_data cfg;
+	struct acm_cfg_data cfg;
 
 	cfg.cb_status = NULL;
 	cfg.interface.init_cb = ihex_process_init;

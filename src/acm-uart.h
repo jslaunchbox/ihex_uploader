@@ -117,7 +117,7 @@ typedef void(*process_status_callback_t)(enum process_status_code status_code);
 /*
  * @brief Interfaces for the different uploaders and process handlers
  */
-struct uploader_interface_cfg_data {
+struct acm_interface_cfg_data {
 	process_init_callback_t init_cb;
 	process_close_callback_t close_cb;
 	process_data_callback_t process_cb;
@@ -135,21 +135,19 @@ struct uploader_interface_cfg_data {
 * data transactions.
 */
 
-struct uploader_cfg_data {
+struct acm_cfg_data {
 	/** Callback to be notified on connection status change */
 	process_status_callback_t cb_status;
-	struct uploader_interface_cfg_data interface;
+	struct acm_interface_cfg_data interface;
 
 	/* Callback to print debug data or state to the user */
 	process_print_state_t print_state;
 };
 
-void process_set_config(struct uploader_cfg_data *config);
+void process_set_config(struct acm_cfg_data *config);
 
-uint32_t uart_get_baudrate(void);
-uint8_t uart_get_last_state();
-void uart_print_status();
-void uart_clear();
+void acm_print_status();
+void acm_clear();
 
 void acm_println(const char *buf);
 void acm_write(const char *buf, int len);

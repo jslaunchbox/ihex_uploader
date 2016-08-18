@@ -522,7 +522,7 @@ void ashell_process_close() {
 }
 
 void ashell_process_start() {
-	struct uploader_cfg_data cfg;
+	struct acm_cfg_data cfg;
 
 	ashell_is_done = false;
 	cfg.cb_status = NULL;
